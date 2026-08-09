@@ -17,21 +17,21 @@ export const PORTFOLIO_CATEGORIES: PortfolioCategory[] = [
     id: 'product-posters',
     slug: 'product-posters',
     label: 'Product Posters',
-    folderName: 'Product Posters',
+    folderName: 'src/assets/catalog/product-posters',
     description: 'პროდუქტის პოსტერების ფოტო-კატალოგი.'
   },
   {
     id: 'branding',
     slug: 'branding',
     label: 'Branding & Identity',
-    folderName: 'Branding & Identity',
+    folderName: 'src/assets/catalog/branding',
     description: 'ლოგოების, ბრენდინგისა და identity დიზაინების ფოტო-კატალოგი.'
   },
   {
     id: 'billboards-print',
     slug: 'billboards-print',
     label: 'Billboards & Print',
-    folderName: 'Billboards & Print',
+    folderName: 'src/assets/catalog/billboards-print',
     description: 'ბილბორდებისა და print მასალების ფოტო-კატალოგი.'
   }
 ];
@@ -48,5 +48,5 @@ export const getPortfolioCategoryBySlug = (slug?: string) =>
   PORTFOLIO_FILTERS.find((category) => category.slug === slug) || ALL_PORTFOLIO_CATEGORY;
 
 // To add new portfolio images, drop them into:
-// public/portfolio/<matching category folder>/
-// The website reads those folders automatically through /api/portfolio-images.
+// src/assets/catalog/<matching category slug>/
+// The website imports those folders automatically with import.meta.glob.

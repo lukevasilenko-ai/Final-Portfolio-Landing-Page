@@ -3,15 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, ArrowUpRight, FolderKanban } from 'lucide-react';
 import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
-import { PortfolioCategory } from '../types';
-
-interface PortfolioApiResponse {
-  categories: PortfolioCategory[];
-}
+import { getPortfolioCategoryCount } from '../data/catalogImages';
 
 const navigateTo = (path: string) => {
   window.history.pushState(null, '', path);
@@ -20,52 +15,6 @@ const navigateTo = (path: string) => {
 };
 
 export default function Projects() {
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadCategoryCounts = async () => {
-      try {
-        const response = await fetch('/api/portfolio-images', {
-          headers: { Accept: 'application/json' },
-          cache: 'no-store'
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as PortfolioApiResponse;
-        const nextCounts = Object.fromEntries(
-          data.categories.map((category) => [category.id, category.count ?? 0])
-        );
-
-        if (isMounted) {
-          setCategoryCounts(nextCounts);
-        }
-      } catch {
-        // Keep the latest valid counts during a transient refresh failure.
-      }
-    };
-
-    loadCategoryCounts();
-    const refreshInterval = window.setInterval(loadCategoryCounts, 4000);
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        loadCategoryCounts();
-      }
-    };
-
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(refreshInterval);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, []);
-
   return (
     <section id="projects" className="section-wrap">
       <div className="container-xl">
@@ -112,7 +61,7 @@ export default function Projects() {
                   {category.label}
                 </h3>
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--brand-soft)]">
-                  {categoryCounts[category.id] ?? 0} photos
+                  {getPortfolioCategoryCount(category.id)} photos
                 </span>
               </div>
             </motion.button>

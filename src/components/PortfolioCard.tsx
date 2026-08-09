@@ -21,7 +21,12 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
   const category = getPortfolioCategoryById(item.category);
   const tags = item.tags ?? [];
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+  const [hasImageError, setHasImageError] = useState(false);
   const isWideImage = imageAspectRatio !== null && imageAspectRatio >= 1.6;
+
+  if (hasImageError) {
+    return null;
+  }
 
   if (imageOnly) {
     return (
@@ -56,6 +61,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
               className="absolute left-1/2 top-1/2 h-[95.238%] w-[95.238%] -translate-x-1/2 -translate-y-1/2 object-contain transition-transform duration-500 ease-out group-hover:scale-[1.018]"
               loading="lazy"
               decoding="async"
+              onError={() => setHasImageError(true)}
               onLoad={(event) => {
                 const image = event.currentTarget;
 
@@ -89,6 +95,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
             src={item.image}
             alt={item.title}
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]"
+            onError={() => setHasImageError(true)}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[rgba(24,26,24,0.42)] via-transparent to-transparent opacity-80" />
 

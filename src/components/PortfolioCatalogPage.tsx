@@ -5,19 +5,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, ImageIcon, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, ImageIcon } from 'lucide-react';
 import {
-  PORTFOLIO_FILTERS,
   getPortfolioCategoryBySlug
 } from '../data/portfolioItems';
+import { PORTFOLIO_FILTERS_WITH_COUNTS, PORTFOLIO_ITEMS } from '../data/catalogImages';
 import { PortfolioCategory, PortfolioCategoryId, PortfolioItem } from '../types';
 import PortfolioCard from './PortfolioCard';
 import PortfolioModal from './PortfolioModal';
-
-interface PortfolioApiResponse {
-  categories: PortfolioCategory[];
-  items: PortfolioItem[];
-}
 
 const getSlugFromPath = () => {
   const [, page, slug] = window.location.pathname.split('/');
@@ -40,73 +35,13 @@ const navigateToCategory = (categoryId: PortfolioCategoryId, slug: string) => {
 };
 
 export default function PortfolioCatalogPage() {
-  const [categories, setCategories] = useState<PortfolioCategory[]>(PORTFOLIO_FILTERS);
-  const [items, setItems] = useState<PortfolioItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const categories = PORTFOLIO_FILTERS_WITH_COUNTS;
+  const items = PORTFOLIO_ITEMS;
   const [selectedCategory, setSelectedCategory] = useState<PortfolioCategoryId>(() =>
     getPortfolioCategoryBySlug(getSlugFromPath()).id
   );
   const [selectedProject, setSelectedProject] = useState<PortfolioItem | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    let hasLoadedOnce = false;
-
-    const loadPortfolioImages = async () => {
-      try {
-        const response = await fetch('/api/portfolio-images', {
-          headers: { Accept: 'application/json' },
-          cache: 'no-store'
-        });
-
-        if (!response.ok) {
-          throw new Error(`Portfolio API failed with ${response.status}`);
-        }
-
-        const data = (await response.json()) as PortfolioApiResponse;
-
-        if (!Array.isArray(data.categories) || !Array.isArray(data.items)) {
-          throw new Error('Portfolio API returned an invalid payload.');
-        }
-
-        if (isMounted) {
-          setCategories(data.categories);
-          setItems(data.items);
-          setLoadError('');
-          hasLoadedOnce = true;
-        }
-      } catch (error) {
-        console.error(error);
-
-        if (isMounted && !hasLoadedOnce) {
-          setCategories(PORTFOLIO_FILTERS);
-          setItems([]);
-          setLoadError('ფოტოების ჩატვირთვა ვერ მოხერხდა. გადაამოწმეთ portfolio folder-ები.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadPortfolioImages();
-    const refreshInterval = window.setInterval(loadPortfolioImages, 2000);
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        loadPortfolioImages();
-      }
-    };
-
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(refreshInterval);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, []);
 
   useEffect(() => {
     const updateCategoryFromPath = () => {
@@ -193,20 +128,9 @@ export default function PortfolioCatalogPage() {
             </div>
           </div>
 
-          {isLoading && (
-            <div className="surface-card flex items-center justify-center gap-3 p-8 text-[var(--brand-muted)]">
-              <LoaderCircle className="h-5 w-5 animate-spin text-[var(--brand-accent)]" />
-              ფოტოები იტვირთება
-            </div>
-          )}
 
-          {!isLoading && loadError && (
-            <div className="surface-card p-8 text-center text-[var(--brand-muted)]">
-              {loadError}
-            </div>
-          )}
 
-          {!isLoading && !loadError && visibleItems.length > 0 && (
+          {visibleItems.length > 0 && (
             <motion.div layout className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <AnimatePresence mode="popLayout">
                 {visibleItems.map((item) => (
@@ -221,7 +145,7 @@ export default function PortfolioCatalogPage() {
             </motion.div>
           )}
 
-          {!isLoading && !loadError && visibleItems.length === 0 && (
+          {visibleItems.length === 0 && (
             <div className="surface-card mt-4 flex flex-col items-center gap-4 p-10 text-center text-[var(--brand-muted)]">
               <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[rgba(36,72,61,0.1)] text-[var(--brand-accent)]">
                 <ImageIcon className="h-5 w-5" />
