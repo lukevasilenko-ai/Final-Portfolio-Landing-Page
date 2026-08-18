@@ -29,6 +29,8 @@ export type PortfolioCategoryId =
 
 export type PortfolioItemCategory = Exclude<PortfolioCategoryId, 'all'>;
 
+export type PortfolioItemKind = 'image' | 'project';
+
 export interface PortfolioCategory {
   id: PortfolioCategoryId;
   slug: string;
@@ -42,6 +44,7 @@ export interface PortfolioItem {
   id: string;
   title: string;
   category: PortfolioItemCategory;
+  kind?: PortfolioItemKind;
   serviceType?: string;
   industry?: string;
   image: string;
@@ -52,6 +55,25 @@ export interface PortfolioItem {
   client?: string;
   filename?: string;
   folderName?: string;
+  projectSlug?: string;
+  imageCount?: number;
+}
+
+export interface PortfolioProject {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: PortfolioItemCategory;
+  cover: string;
+  tags: string[];
+  tools: string[];
+  year?: string;
+  publishedDate?: string;
+  author?: string;
+  location?: string;
+  folderName: string;
+  images: PortfolioItem[];
 }
 
 export interface Experience {

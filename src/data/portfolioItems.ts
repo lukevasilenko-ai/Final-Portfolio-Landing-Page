@@ -24,7 +24,7 @@ export const PORTFOLIO_CATEGORIES: PortfolioCategory[] = [
     id: 'branding',
     slug: 'branding',
     label: 'Branding & Identity',
-    folderName: 'src/assets/catalog/branding',
+    folderName: 'src/assets/catalog/branding-identity',
     description: 'ლოგოების, ბრენდინგისა და identity დიზაინების ფოტო-კატალოგი.'
   },
   {
@@ -47,6 +47,6 @@ export const getPortfolioCategoryById = (id: PortfolioCategoryId) =>
 export const getPortfolioCategoryBySlug = (slug?: string) =>
   PORTFOLIO_FILTERS.find((category) => category.slug === slug) || ALL_PORTFOLIO_CATEGORY;
 
-// To add new portfolio images, drop them into:
-// src/assets/catalog/<matching category slug>/
-// The website imports those folders automatically with import.meta.glob.
+// Standalone images live in src/assets/catalog/<category slug>/.
+// Branding projects live in src/assets/catalog/branding-identity/<project slug>/
+// with project.json, cover.*, and naturally sorted numbered images.

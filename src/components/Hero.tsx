@@ -117,7 +117,7 @@ export default function Hero() {
                 alt="ავეჯის სარეკლამო პოსტერი"
                 className="h-full w-full object-cover"
               />
-              <div className="absolute bottom-3 right-3 rounded-lg border border-white/55 bg-white/70 px-4 py-2 text-sm font-bold text-[var(--brand-ink)] shadow-[var(--brand-shadow-soft)] backdrop-blur-md">
+              <div className="absolute bottom-3 right-3 rounded-lg border border-[var(--brand-line)] bg-white/70 px-4 py-2 text-sm font-bold text-[var(--brand-ink)] shadow-[var(--brand-shadow-soft)] backdrop-blur-md">
                 ბოლო ნამუშევარი
               </div>
             </div>

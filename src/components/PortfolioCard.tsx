@@ -22,6 +22,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
   const tags = item.tags ?? [];
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
   const [hasImageError, setHasImageError] = useState(false);
+  const isProject = item.kind === 'project';
   const isWideImage = imageAspectRatio !== null && imageAspectRatio >= 1.6;
 
   if (hasImageError) {
@@ -43,17 +44,17 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
         }}
         whileTap={{ scale: 0.99 }}
         transition={{ duration: 0.28, ease: 'easeOut' }}
-        className={`group relative self-start overflow-hidden rounded-lg border border-[var(--brand-line)] bg-white/72 outline outline-2 outline-transparent outline-offset-2 shadow-[0_18px_50px_rgba(23,31,27,0.08)] transition-[border-color,background-color,box-shadow,outline-color] duration-300 will-change-transform hover:border-[var(--brand-accent)] hover:bg-white hover:outline-[var(--brand-accent)] hover:shadow-[0_28px_70px_rgba(23,31,27,0.18)] ${isWideImage ? 'col-span-2' : ''}`}
+        className={`group relative self-start overflow-hidden rounded-lg border border-[var(--brand-line)] bg-white/72 outline outline-2 outline-transparent outline-offset-2 shadow-[var(--brand-shadow-soft)] transition-[border-color,background-color,box-shadow,outline-color] duration-300 will-change-transform hover:border-[var(--brand-accent)] hover:bg-white hover:outline-[var(--brand-accent)] hover:shadow-[var(--brand-shadow)] ${isProject || isWideImage ? 'col-span-2' : ''}`}
       >
         <button
           type="button"
           onClick={() => onOpen(item)}
-          className="block w-full border-0 bg-transparent p-0"
-          aria-label={`Open ${item.title}`}
+          className="block w-full border-0 bg-transparent p-0 text-left"
+          aria-label={isProject ? `Open project ${item.title}` : `Open ${item.title}`}
         >
           <div
             className="relative w-full overflow-hidden bg-[var(--brand-page-soft)] transition-colors duration-300 group-hover:bg-white"
-            style={{ aspectRatio: imageAspectRatio ?? 1 }}
+            style={{ aspectRatio: imageAspectRatio ?? (isProject ? 16 / 9 : 1) }}
           >
             <img
               src={item.image}
@@ -71,6 +72,23 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
               }}
             />
           </div>
+
+          {isProject && (
+            <div className="flex min-h-[92px] items-center justify-between gap-4 border-t border-[var(--brand-line)] px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] font-bold uppercase text-[var(--brand-soft)]">
+                  Branding & Identity
+                </p>
+                <h2 className="mt-1 truncate text-lg font-extrabold text-[var(--brand-ink)]">
+                  {item.title}
+                </h2>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                  {item.imageCount ?? 0} images
+                </p>
+              </div>
+              <ArrowUpRight className="h-5 w-5 shrink-0 text-[var(--brand-soft)] transition-colors group-hover:text-[var(--brand-accent)]" />
+            </div>
+          )}
         </button>
       </motion.article>
     );
@@ -97,14 +115,14 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]"
             onError={() => setHasImageError(true)}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[rgba(24,26,24,0.42)] via-transparent to-transparent opacity-80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--brand-image-shade)] via-transparent to-transparent opacity-80" />
 
           <span className="tag-chip absolute left-4 top-4 px-3 py-1.5">
             {category.label}
           </span>
 
           {item.featured && (
-            <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full border border-white/30 bg-white/80 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)] backdrop-blur-xl">
+            <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full border border-[var(--brand-line)] bg-white/80 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)] backdrop-blur-xl">
               <Star className="h-3.5 w-3.5 fill-[var(--brand-accent)]" />
               Featured
             </span>

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import {
   Calculator,
   CheckCircle2,
@@ -21,8 +21,7 @@ type ServiceId =
   | 'cover'
   | 'templatePoster'
   | 'businessCards'
-  | 'googleReviewSet'
-  | 'stickers';
+  | 'googleReviewSet';
 
 type ServiceGroup = 'design' | 'print';
 
@@ -32,7 +31,6 @@ interface Service {
   group: ServiceGroup;
   priceRange?: [number, number];
   template?: boolean;
-  customPrice?: boolean;
   supportsExtraFormats?: boolean;
 }
 
@@ -53,7 +51,7 @@ const services: Record<ServiceId, Service> = {
   },
   templatePoster: {
     label: 'შაბლონური პოსტერი',
-    note: 'დიზაინი 100 ლარი, ყოველი ცვლილება 15 ლარი',
+    note: 'დიზაინი 140 ლარი, თითო ცვლილება 20 ლარი',
     group: 'design',
     template: true,
     supportsExtraFormats: true
@@ -69,12 +67,6 @@ const services: Record<ServiceId, Service> = {
     note: 'დიზაინის სტანდარტული ფასი: 150-250 ლარი',
     group: 'print',
     priceRange: [150, 250]
-  },
-  stickers: {
-    label: 'სტიკერები',
-    note: 'ფასი დამოკიდებულია ზომასა და ტირაჟზე',
-    group: 'print',
-    customPrice: true
   }
 };
 
@@ -92,15 +84,93 @@ const serviceGroups: Array<{
   },
   {
     id: 'print',
-    label: 'საბეჭდი მასალები',
+    label: 'საბეჭდი მასალა',
     icon: Printer,
-    items: ['businessCards', 'googleReviewSet', 'stickers']
+    items: ['businessCards', 'googleReviewSet']
   }
 ];
 
 const roundToFive = (value: number) => Math.round(value / 5) * 5;
 
+interface SmoothRangeProps {
+  min: number;
+  max: number;
+  value: number;
+  onChange: (value: number) => void;
+  ariaLabel: string;
+}
+
+function SmoothRange({ min, max, value, onChange, ariaLabel }: SmoothRangeProps) {
+  const [draftValue, setDraftValue] = useState(value);
+  const [isDragging, setIsDragging] = useState(false);
+  const progress = ((draftValue - min) / (max - min)) * 100;
+
+  useEffect(() => {
+    if (!isDragging) {
+      setDraftValue(value);
+    }
+  }, [isDragging, value]);
+
+  const updateDraftValue = (nextValue: number) => {
+    const clampedValue = Math.min(max, Math.max(min, nextValue));
+    const roundedValue = Math.round(clampedValue);
+
+    setDraftValue(clampedValue);
+
+    if (roundedValue !== value) {
+      onChange(roundedValue);
+    }
+  };
+
+  const commitValue = (nextValue: number) => {
+    const roundedValue = Math.min(max, Math.max(min, Math.round(nextValue)));
+
+    setIsDragging(false);
+    setDraftValue(roundedValue);
+    onChange(roundedValue);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const direction = event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+      ? -1
+      : event.key === 'ArrowRight' || event.key === 'ArrowUp'
+        ? 1
+        : 0;
+
+    if (direction === 0) return;
+
+    event.preventDefault();
+    commitValue(value + direction);
+  };
+
+  return (
+    <div className="smooth-range-wrap">
+      <div
+        className={`smooth-range-fill${isDragging ? ' is-dragging' : ''}`}
+        style={{ transform: `translateY(-50%) scaleX(${progress / 100})` }}
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step="0.01"
+        value={draftValue}
+        onPointerDown={() => setIsDragging(true)}
+        onPointerUp={(event) => commitValue(Number(event.currentTarget.value))}
+        onPointerCancel={(event) => commitValue(Number(event.currentTarget.value))}
+        onBlur={(event) => commitValue(Number(event.currentTarget.value))}
+        onChange={(event) => updateDraftValue(Number(event.currentTarget.value))}
+        onKeyDown={handleKeyDown}
+        className="smooth-range"
+        aria-label={ariaLabel}
+        aria-valuetext={String(Math.round(draftValue))}
+      />
+    </div>
+  );
+}
+
 export default function PriceCalculator() {
+  const [activeGroup, setActiveGroup] = useState<ServiceGroup>('design');
   const [service, setService] = useState<ServiceId>('poster');
   const [quantity, setQuantity] = useState(1);
   const [templateChanges, setTemplateChanges] = useState(0);
@@ -108,17 +178,18 @@ export default function PriceCalculator() {
   const [extraFormats, setExtraFormats] = useState(false);
 
   const selectedService = services[service];
-  const isCustomPrice = Boolean(selectedService.customPrice);
+  const activeServiceGroup = serviceGroups.find((group) => group.id === activeGroup) ?? serviceGroups[0];
 
   const estimate = useMemo(() => {
-    if (selectedService.customPrice) return null;
-
     const rushMultiplier = rush ? 1.2 : 1;
-    const extraFormatsFee = selectedService.supportsExtraFormats && extraFormats ? 15 * quantity : 0;
+    const serviceQuantity = selectedService.template ? 1 : quantity;
+    const extraFormatsFee = selectedService.supportsExtraFormats && extraFormats
+      ? 15 * serviceQuantity
+      : 0;
 
     if (selectedService.template) {
-      const templateBase = 100 * quantity;
-      const changesFee = templateChanges * 15;
+      const templateBase = 140;
+      const changesFee = templateChanges * 20;
       const total = roundToFive((templateBase + changesFee + extraFormatsFee) * rushMultiplier);
 
       return { min: total, max: total };
@@ -132,13 +203,9 @@ export default function PriceCalculator() {
     return { min, max };
   }, [extraFormats, quantity, rush, selectedService, templateChanges]);
 
-  const quantityProgress = ((quantity - 1) / 9) * 100;
-  const templateChangesProgress = (templateChanges / 20) * 100;
-  const estimateLabel = estimate
-    ? estimate.min === estimate.max
-      ? `${estimate.min} ლარი`
-      : `${estimate.min}-${estimate.max} ლარი`
-    : 'ინდივიდუალური ფასი';
+  const estimateLabel = estimate.min === estimate.max
+    ? `${estimate.min} ლარი`
+    : `${estimate.min}-${estimate.max} ლარი`;
 
   const setQuantitySafely = (nextValue: number) => {
     setQuantity(Math.min(10, Math.max(1, nextValue)));
@@ -146,6 +213,29 @@ export default function PriceCalculator() {
 
   const setTemplateChangesSafely = (nextValue: number) => {
     setTemplateChanges(Math.min(20, Math.max(0, nextValue)));
+  };
+
+  const selectService = (nextService: ServiceId) => {
+    setService(nextService);
+
+    if (services[nextService].template) {
+      setQuantity(1);
+      setRush(false);
+      setExtraFormats(false);
+    }
+  };
+
+  const selectServiceGroup = (nextGroup: ServiceGroup) => {
+    const group = serviceGroups.find((candidate) => candidate.id === nextGroup);
+
+    if (!group) return;
+
+    setActiveGroup(nextGroup);
+    setService(group.items[0]);
+    setQuantity(1);
+    setTemplateChanges(0);
+    setRush(false);
+    setExtraFormats(false);
   };
 
   return (
@@ -158,46 +248,70 @@ export default function PriceCalculator() {
           </span>
           <h2 className="section-title">დათვალეთ სავარაუდო ბიუჯეტი.</h2>
           <p className="section-subtitle max-w-2xl">
-            აირჩიეთ დიზაინის ან საბეჭდი მომსახურება და რაოდენობა. სტიკერების ფასი ზომისა და ტირაჟის მიხედვით ინდივიდუალურად განისაზღვრება.
+            აირჩიეთ დიზაინის მომსახურება ან საბეჭდი მასალა და მიუთითეთ საჭირო პარამეტრები.
           </p>
         </div>
 
         <div className="surface-card-strong grid grid-cols-1 gap-0 overflow-hidden lg:grid-cols-[1.15fr_0.85fr]">
           <div className="flex flex-col gap-8 p-6 sm:p-8">
-            {serviceGroups.map((group) => {
-              const GroupIcon = group.icon;
+            <div
+              className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--brand-line)] bg-white/45 p-1"
+              role="tablist"
+              aria-label="მომსახურების ტიპი"
+            >
+              {serviceGroups.map((group) => {
+                const GroupIcon = group.icon;
+                const isActive = activeGroup === group.id;
 
-              return (
-                <div key={group.id} className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-ink)]">
-                    <GroupIcon
-                      className={`h-4 w-4 ${group.id === 'print' ? 'text-[var(--brand-copper)]' : 'text-[var(--brand-accent)]'}`}
-                    />
-                    {group.label}
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {group.items.map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        aria-pressed={service === item}
-                        onClick={() => setService(item)}
-                        className={`rounded-lg border px-4 py-4 text-left transition-colors ${
-                          service === item
-                            ? 'border-[var(--brand-accent)] bg-[rgba(36,72,61,0.1)] text-[var(--brand-ink)]'
-                            : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
-                        }`}
-                      >
-                        <span className="block text-base font-bold">{services[item].label}</span>
-                        <span className="mt-2 block text-sm leading-6">{services[item].note}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-controls={`calculator-${group.id}-services`}
+                    onClick={() => selectServiceGroup(group.id)}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-bold transition-colors ${
+                      isActive
+                        ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)] shadow-[var(--brand-accent-shadow-xs)]'
+                        : 'text-[var(--brand-muted)] hover:bg-white hover:text-[var(--brand-ink)]'
+                    }`}
+                  >
+                    <GroupIcon className="h-4 w-4 shrink-0" />
+                    <span>{group.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-            {!isCustomPrice && (
+            <motion.div
+              key={activeServiceGroup.id}
+              id={`calculator-${activeServiceGroup.id}-services`}
+              role="tabpanel"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {activeServiceGroup.items.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={service === item}
+                  onClick={() => selectService(item)}
+                  className={`rounded-lg border px-4 py-4 text-left transition-colors ${
+                    service === item
+                      ? 'border-[var(--brand-accent)] bg-[var(--brand-accent-soft)] text-[var(--brand-ink)]'
+                      : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
+                  }`}
+                >
+                  <span className="block text-base font-bold">{services[item].label}</span>
+                  <span className="mt-2 block text-sm leading-6">{services[item].note}</span>
+                </button>
+              ))}
+            </motion.div>
+
+            {!selectedService.template && (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-ink)]">
@@ -232,22 +346,13 @@ export default function PriceCalculator() {
                     </button>
                   </div>
                 </div>
-                <div className="smooth-range-wrap">
-                  <motion.div
-                    className="smooth-range-fill"
-                    animate={{ width: `${quantityProgress}%` }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                  />
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={quantity}
-                    onChange={(event) => setQuantitySafely(Number(event.target.value))}
-                    className="smooth-range"
-                    aria-label="Project quantity"
-                  />
-                </div>
+                <SmoothRange
+                  min={1}
+                  max={10}
+                  value={quantity}
+                  onChange={setQuantitySafely}
+                  ariaLabel="Project quantity"
+                />
               </div>
             )}
 
@@ -286,72 +391,51 @@ export default function PriceCalculator() {
                     </button>
                   </div>
                 </div>
-                <div className="smooth-range-wrap">
-                  <motion.div
-                    className="smooth-range-fill"
-                    animate={{ width: `${templateChangesProgress}%` }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    value={templateChanges}
-                    onChange={(event) => setTemplateChangesSafely(Number(event.target.value))}
-                    className="smooth-range"
-                    aria-label="Template changes quantity"
-                  />
-                </div>
+                <SmoothRange
+                  min={0}
+                  max={20}
+                  value={templateChanges}
+                  onChange={setTemplateChangesSafely}
+                  ariaLabel="Template changes quantity"
+                />
                 <p className="text-sm leading-7 text-[var(--brand-muted)]">
-                  შაბლონური დიზაინის საბაზო ფასი არის 100 ლარი. თითო ცვლილება ემატება 15 ლარად.
+                  ერთი შაბლონური პოსტერის დიზაინი ღირს 140 ლარი. თითო ცვლილება ემატება 20 ლარად; სასწრაფო ვადა და დამატებითი ზომები ცალკე ითვლება.
                 </p>
               </div>
             )}
 
-            {isCustomPrice ? (
-              <div className="rounded-lg border border-[var(--brand-line)] bg-white/55 p-5">
-                <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-ink)]">
-                  <Sparkles className="h-4 w-4 text-[var(--brand-plum)]" />
-                  ინდივიდუალური გაანგარიშება
-                </div>
-                <p className="mt-2 text-sm leading-7 text-[var(--brand-muted)]">
-                  სტიკერების საბოლოო ფასი ითვლება ზომის, ფორმის, მასალისა და ტირაჟის მიხედვით. მომწერეთ სასურველი პარამეტრები ზუსტი შეთავაზებისთვის.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setRush((value) => !value)}
+                className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                  rush
+                    ? 'border-[var(--brand-copper)] bg-[var(--brand-copper-soft)] text-[var(--brand-ink)]'
+                    : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
+                }`}
+              >
+                <Clock className="h-4 w-4 shrink-0" />
+                სასწრაფო ვადა
+              </button>
+
+              {selectedService.supportsExtraFormats && (
                 <button
                   type="button"
-                  onClick={() => setRush((value) => !value)}
+                  onClick={() => setExtraFormats((value) => !value)}
                   className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                    rush
-                      ? 'border-[var(--brand-copper)] bg-[rgba(180,95,60,0.12)] text-[var(--brand-ink)]'
+                    extraFormats
+                      ? 'border-[var(--brand-accent)] bg-[var(--brand-accent-soft)] text-[var(--brand-ink)]'
                       : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
                   }`}
                 >
-                  <Clock className="h-4 w-4 shrink-0" />
-                  სასწრაფო ვადა
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  დამატებითი ზომები (სთორი/ბანერი)
                 </button>
-
-                {selectedService.supportsExtraFormats && (
-                  <button
-                    type="button"
-                    onClick={() => setExtraFormats((value) => !value)}
-                    className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                      extraFormats
-                        ? 'border-[var(--brand-accent)] bg-[rgba(36,72,61,0.1)] text-[var(--brand-ink)]'
-                        : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
-                    }`}
-                  >
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    დამატებითი ზომები (სთორი/ბანერი)
-                  </button>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-col justify-between gap-8 border-t border-[var(--brand-line)] bg-[rgba(36,72,61,0.06)] p-6 sm:p-8 lg:border-l lg:border-t-0">
+          <div className="flex flex-col justify-between gap-8 border-t border-[var(--brand-line)] bg-[var(--brand-accent-wash)] p-6 sm:p-8 lg:border-l lg:border-t-0">
             <div className="flex flex-col gap-5">
               <span className="eyebrow">
                 <span className="eyebrow-dot" />
@@ -359,24 +443,22 @@ export default function PriceCalculator() {
               </span>
               <div className="flex flex-col gap-2">
                 <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] text-[var(--brand-muted)]">
-                  {isCustomPrice ? 'ზუსტი ფასი შეთანხმებით' : 'სავარაუდო დიაპაზონი'}
+                  სავარაუდო დიაპაზონი
                 </span>
                 <motion.strong
                   key={estimateLabel}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.24, ease: 'easeOut' }}
-                  className={`${isCustomPrice ? 'text-4xl' : 'text-5xl'} font-extrabold leading-tight text-[var(--brand-accent)]`}
+                  className="text-5xl font-extrabold leading-tight text-[var(--brand-accent)]"
                 >
                   {estimateLabel}
                 </motion.strong>
               </div>
               <p className="text-sm leading-7 text-[var(--brand-muted)]">
                 {selectedService.template
-                  ? 'შაბლონურ პოსტერზე ფასი ითვლება ფორმულით: დიზაინი 100 ლარი + თითო ცვლილება 15 ლარი.'
-                  : isCustomPrice
-                    ? 'მიუთითეთ სასურველი ზომა, რაოდენობა და მასალა. ამის შემდეგ მიიღებთ ზუსტ ღირებულებას.'
-                    : 'ეს არის საორიენტაციო ფასი. ზუსტი ღირებულება დასტურდება ბრიფისა და სამუშაოს მოცულობის ნახვის შემდეგ.'}
+                  ? 'შაბლონურ პოსტერზე ფასი ითვლება ფორმულით: დიზაინი 140 ლარი + თითო ცვლილება 20 ლარი.'
+                  : 'ეს არის საორიენტაციო ფასი. ზუსტი ღირებულება დასტურდება ბრიფისა და სამუშაოს მოცულობის ნახვის შემდეგ.'}
               </p>
             </div>
 
@@ -384,19 +466,19 @@ export default function PriceCalculator() {
               <div className="flex items-center justify-between gap-4">
                 <span>კატეგორია</span>
                 <strong className="text-right text-[var(--brand-ink)]">
-                  {selectedService.group === 'print' ? 'საბეჭდი მასალები' : 'დიზაინი'}
+                  {selectedService.group === 'print' ? 'საბეჭდი მასალა' : 'დიზაინი'}
                 </strong>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <span>მომსახურება</span>
                 <strong className="text-right text-[var(--brand-ink)]">{selectedService.label}</strong>
               </div>
-              {!isCustomPrice && (
-                <div className="flex items-center justify-between gap-4">
-                  <span>რაოდენობა</span>
-                  <strong className="text-[var(--brand-ink)]">{quantity}</strong>
-                </div>
-              )}
+              <div className="flex items-center justify-between gap-4">
+                <span>რაოდენობა</span>
+                <strong className="text-[var(--brand-ink)]">
+                  {selectedService.template ? 1 : quantity}
+                </strong>
+              </div>
               {selectedService.template && (
                 <>
                   <div className="flex items-center justify-between gap-4">
@@ -405,20 +487,14 @@ export default function PriceCalculator() {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <span>1 ცვლილება</span>
-                    <strong className="text-[var(--brand-ink)]">15 ლარი</strong>
+                    <strong className="text-[var(--brand-ink)]">20 ლარი</strong>
                   </div>
                 </>
-              )}
-              {isCustomPrice && (
-                <div className="flex items-center justify-between gap-4">
-                  <span>ზომა / ტირაჟი</span>
-                  <strong className="text-[var(--brand-ink)]">შეთანხმებით</strong>
-                </div>
               )}
             </div>
 
             <a href="#contact" className="button-primary w-full">
-              {isCustomPrice ? 'ზუსტი ფასის მოთხოვნა' : 'შეკვეთის განხილვა'}
+              შეკვეთის განხილვა
             </a>
           </div>
         </div>

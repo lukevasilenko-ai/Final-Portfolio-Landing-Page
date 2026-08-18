@@ -7,16 +7,33 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ImageIcon } from 'lucide-react';
 import {
+  getPortfolioCategoryById,
   getPortfolioCategoryBySlug
 } from '../data/portfolioItems';
-import { PORTFOLIO_FILTERS_WITH_COUNTS, PORTFOLIO_ITEMS } from '../data/catalogImages';
-import { PortfolioCategory, PortfolioCategoryId, PortfolioItem } from '../types';
+import {
+  getPortfolioProject,
+  PORTFOLIO_FILTERS_WITH_COUNTS,
+  PORTFOLIO_ITEMS
+} from '../data/catalogImages';
+import {
+  PortfolioCategory,
+  PortfolioCategoryId,
+  PortfolioItem,
+  PortfolioItemCategory
+} from '../types';
+import { navigateWithinSite } from '../navigation';
 import PortfolioCard from './PortfolioCard';
 import PortfolioModal from './PortfolioModal';
 
-const getSlugFromPath = () => {
-  const [, page, slug] = window.location.pathname.split('/');
-  return page === 'portfolio' ? slug : undefined;
+interface PortfolioRoute {
+  categorySlug?: string;
+  projectSlug?: string;
+}
+
+const getPortfolioRoute = (): PortfolioRoute => {
+  const [, page, categorySlug, projectSlug] = window.location.pathname.split('/');
+
+  return page === 'portfolio' ? { categorySlug, projectSlug } : {};
 };
 
 const getCategoryFromSlug = (slug: string | undefined, categories: PortfolioCategory[]) =>
@@ -28,40 +45,43 @@ const getCategoryCount = (category: PortfolioCategory, items: PortfolioItem[]) =
     : items.filter((item) => item.category === category.id).length;
 
 const navigateToCategory = (categoryId: PortfolioCategoryId, slug: string) => {
-  const path = categoryId === 'all' ? '/portfolio' : `/portfolio/${slug}`;
-  window.history.pushState(null, '', path);
-  window.dispatchEvent(new Event('app:navigate'));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  navigateWithinSite(categoryId === 'all' ? '/portfolio' : `/portfolio/${slug}`);
+};
+
+const navigateToProject = (categoryId: PortfolioItemCategory, projectSlug: string) => {
+  const category = getPortfolioCategoryById(categoryId);
+  navigateWithinSite(`/portfolio/${category.slug}/${projectSlug}`);
 };
 
 export default function PortfolioCatalogPage() {
   const categories = PORTFOLIO_FILTERS_WITH_COUNTS;
   const items = PORTFOLIO_ITEMS;
-  const [selectedCategory, setSelectedCategory] = useState<PortfolioCategoryId>(() =>
-    getPortfolioCategoryBySlug(getSlugFromPath()).id
-  );
-  const [selectedProject, setSelectedProject] = useState<PortfolioItem | null>(null);
-
+  const [route, setRoute] = useState<PortfolioRoute>(getPortfolioRoute);
+  const [selectedImage, setSelectedImage] = useState<PortfolioItem | null>(null);
 
   useEffect(() => {
-    const updateCategoryFromPath = () => {
-      setSelectedCategory(getCategoryFromSlug(getSlugFromPath(), categories).id);
+    const updateRoute = () => {
+      setRoute(getPortfolioRoute());
+      setSelectedImage(null);
     };
 
-    updateCategoryFromPath();
-    window.addEventListener('popstate', updateCategoryFromPath);
-    window.addEventListener('app:navigate', updateCategoryFromPath);
+    window.addEventListener('popstate', updateRoute);
+    window.addEventListener('app:navigate', updateRoute);
 
     return () => {
-      window.removeEventListener('popstate', updateCategoryFromPath);
-      window.removeEventListener('app:navigate', updateCategoryFromPath);
+      window.removeEventListener('popstate', updateRoute);
+      window.removeEventListener('app:navigate', updateRoute);
     };
-  }, [categories]);
+  }, []);
 
   const activeCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategory) || categories[0],
-    [categories, selectedCategory]
+    () => getCategoryFromSlug(route.categorySlug, categories),
+    [categories, route.categorySlug]
   );
+  const selectedCategory = activeCategory.id;
+  const activeProject = route.projectSlug && selectedCategory !== 'all'
+    ? getPortfolioProject(selectedCategory, route.projectSlug)
+    : undefined;
 
   const visibleItems = useMemo(
     () =>
@@ -70,6 +90,102 @@ export default function PortfolioCatalogPage() {
         : items.filter((item) => item.category === selectedCategory),
     [items, selectedCategory]
   );
+
+  const modalItems = useMemo(
+    () => visibleItems.filter((item) => item.kind !== 'project'),
+    [visibleItems]
+  );
+
+  const handleOpenItem = (item: PortfolioItem) => {
+    if (item.kind === 'project' && item.projectSlug) {
+      navigateToProject(item.category, item.projectSlug);
+      return;
+    }
+
+    setSelectedImage(item);
+  };
+
+  if (activeProject) {
+    return (
+      <main className="content-layer">
+        <section className="section-wrap pb-10">
+          <div className="container-xl">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="flex min-h-[300px] flex-col justify-end gap-7 border-b border-[var(--brand-line)] pb-10 pt-20"
+            >
+              <button
+                type="button"
+                onClick={() => navigateToCategory(activeCategory.id, activeCategory.slug)}
+                className="button-secondary w-fit gap-2 text-xs"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Branding & Identity
+              </button>
+
+              <div className="flex max-w-4xl flex-col gap-5">
+                <span className="eyebrow">
+                  <span className="eyebrow-dot" />
+                  Branding project
+                </span>
+                <h1 className="section-title">{activeProject.title}</h1>
+                <p className="section-subtitle max-w-3xl">
+                  {activeProject.description || `${activeProject.images.length} image project`}
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {activeProject.year && (
+                    <span className="tag-chip px-3 py-1.5">{activeProject.year}</span>
+                  )}
+                  {activeProject.tools.map((tool) => (
+                    <span key={tool} className="tag-chip px-3 py-1.5">{tool}</span>
+                  ))}
+                  {activeProject.tags.map((tag) => (
+                    <span key={tag} className="tag-chip px-3 py-1.5">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="px-4 pb-24 sm:px-8">
+          {activeProject.images.length > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+              className="mx-auto w-full max-w-[1180px] overflow-hidden bg-white shadow-[var(--brand-shadow)]"
+              aria-label={`${activeProject.title} project`}
+            >
+              {activeProject.images.map((item, index) => (
+                <img
+                  key={item.id}
+                  src={item.image}
+                  alt={`${activeProject.title} project image ${index + 1}`}
+                  className="block h-auto w-full"
+                  loading={index < 2 ? 'eager' : 'lazy'}
+                  decoding={index < 2 ? 'sync' : 'async'}
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            <div className="container-xl px-5 sm:px-8">
+              <div className="surface-card flex flex-col items-center gap-4 p-10 text-center text-[var(--brand-muted)]">
+                <ImageIcon className="h-5 w-5 text-[var(--brand-accent)]" />
+                <p>ამ პროექტში ფოტოები ჯერ არ არის.</p>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="content-layer">
@@ -81,10 +197,14 @@ export default function PortfolioCatalogPage() {
             transition={{ duration: 0.35, ease: 'easeOut' }}
             className="flex min-h-[270px] flex-col justify-end gap-7 border-b border-[var(--brand-line)] pb-10 pt-20"
           >
-            <a href="/#projects" className="button-secondary w-fit gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => navigateWithinSite('/#projects')}
+              className="button-secondary w-fit gap-2 text-xs"
+            >
               <ArrowLeft className="h-4 w-4" />
               უკან დაბრუნება
-            </a>
+            </button>
 
             <div className="flex max-w-4xl flex-col gap-5">
               <span className="eyebrow">
@@ -95,7 +215,7 @@ export default function PortfolioCatalogPage() {
                 {selectedCategory === 'all' ? 'ფოტოების კატალოგი' : activeCategory.label}
               </h1>
               <p className="section-subtitle max-w-3xl">
-                აირჩიეთ კატეგორია და ნახეთ შესაბამის folder-ში დამატებული ფოტოები.
+                აირჩიეთ კატეგორია და ნახეთ შესაბამის folder-ში დამატებული ფოტოები და პროექტები.
               </p>
             </div>
           </motion.div>
@@ -104,7 +224,7 @@ export default function PortfolioCatalogPage() {
 
       <section className="px-5 pb-24 sm:px-8">
         <div className="container-xl">
-          <div className="sticky top-[76px] z-30 -mx-5 mb-8 border-y border-[var(--brand-line)] bg-[rgba(244,246,242,0.84)] px-5 py-4 backdrop-blur-xl sm:-mx-8 sm:px-8">
+          <div className="sticky top-[76px] z-30 -mx-5 mb-8 border-y border-[var(--brand-line)] bg-[var(--brand-header-surface)] px-5 py-4 backdrop-blur-xl sm:-mx-8 sm:px-8">
             <div className="container-xl flex gap-2 overflow-x-auto pb-1">
               {categories.filter((category) => category.id !== 'all').map((category) => {
                 const isActive = selectedCategory === category.id;
@@ -116,7 +236,7 @@ export default function PortfolioCatalogPage() {
                     onClick={() => navigateToCategory(category.id, category.slug)}
                     className={`shrink-0 rounded-full px-4 py-2 font-mono text-xs font-bold transition-all duration-200 ${
                       isActive
-                        ? 'bg-[var(--brand-accent)] text-white shadow-[0_10px_24px_rgba(36,72,61,0.16)]'
+                        ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)] shadow-[var(--brand-accent-shadow-sm)]'
                         : 'border border-[var(--brand-line)] bg-white/58 text-[var(--brand-muted)] hover:bg-white hover:text-[var(--brand-ink)]'
                     }`}
                   >
@@ -128,8 +248,6 @@ export default function PortfolioCatalogPage() {
             </div>
           </div>
 
-
-
           {visibleItems.length > 0 && (
             <motion.div layout className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <AnimatePresence mode="popLayout">
@@ -137,7 +255,7 @@ export default function PortfolioCatalogPage() {
                   <PortfolioCard
                     key={item.id}
                     item={item}
-                    onOpen={setSelectedProject}
+                    onOpen={handleOpenItem}
                     imageOnly
                   />
                 ))}
@@ -147,20 +265,20 @@ export default function PortfolioCatalogPage() {
 
           {visibleItems.length === 0 && (
             <div className="surface-card mt-4 flex flex-col items-center gap-4 p-10 text-center text-[var(--brand-muted)]">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[rgba(36,72,61,0.1)] text-[var(--brand-accent)]">
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                 <ImageIcon className="h-5 w-5" />
               </span>
-              <p>ამ folder-ში ფოტო ჯერ არ არის.</p>
+              <p>ამ folder-ში ფოტო ან პროექტი ჯერ არ არის.</p>
             </div>
           )}
         </div>
       </section>
 
       <PortfolioModal
-        item={selectedProject}
-        items={visibleItems}
-        onClose={() => setSelectedProject(null)}
-        onSelect={setSelectedProject}
+        item={selectedImage}
+        items={modalItems}
+        onClose={() => setSelectedImage(null)}
+        onSelect={setSelectedImage}
         imageOnly
       />
     </main>

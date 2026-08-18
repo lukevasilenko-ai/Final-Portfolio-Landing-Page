@@ -14,6 +14,16 @@ const navigateTo = (path: string) => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+const getCategoryCountLabel = (categoryId: string) => {
+  const count = getPortfolioCategoryCount(categoryId);
+
+  if (categoryId === 'branding') {
+    return `${count} ${count === 1 ? 'project' : 'projects'}`;
+  }
+
+  return `${count} ${count === 1 ? 'photo' : 'photos'}`;
+};
+
 export default function Projects() {
   return (
     <section id="projects" className="section-wrap">
@@ -50,7 +60,7 @@ export default function Projects() {
               className="surface-card group flex min-h-[150px] flex-col justify-between p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[var(--brand-line-strong)] hover:bg-white/90 hover:shadow-[var(--brand-shadow)]"
             >
               <div className="flex items-start justify-between gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(36,72,61,0.1)] text-[var(--brand-accent)]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                   <FolderKanban className="h-5 w-5" />
                 </span>
                 <ArrowUpRight className="h-5 w-5 text-[var(--brand-soft)] transition-colors group-hover:text-[var(--brand-accent)]" />
@@ -61,7 +71,7 @@ export default function Projects() {
                   {category.label}
                 </h3>
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--brand-soft)]">
-                  {getPortfolioCategoryCount(category.id)} photos
+                  {getCategoryCountLabel(category.id)}
                 </span>
               </div>
             </motion.button>

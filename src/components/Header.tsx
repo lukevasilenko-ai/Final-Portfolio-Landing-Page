@@ -3,18 +3,78 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X, ArrowUpRight } from 'lucide-react';
+import { Menu, X, ArrowUpRight, Moon, Sun } from 'lucide-react';
 import { BRAND_MARK } from '../data';
+import { navigateWithinSite } from '../navigation';
 
 interface HeaderProps {
   activeSection: string;
 }
 
+type ThemeMode = 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'luka-imagines-theme';
+
+const getInitialTheme = (): ThemeMode => {
+  if (typeof window === 'undefined') return 'light';
+
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+};
+
+interface ThemeToggleProps {
+  theme: ThemeMode;
+  onToggle: () => void;
+}
+
+function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
+  const isDark = theme === 'dark';
+  const label = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="icon-button h-10 w-10 shrink-0"
+      aria-label={label}
+      aria-pressed={isDark}
+      title={label}
+    >
+      <AnimatePresence initial={false} mode="wait">
+        <motion.span
+          key={theme}
+          initial={{ opacity: 0, rotate: -35, scale: 0.75 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={{ opacity: 0, rotate: 35, scale: 0.75 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </motion.span>
+      </AnimatePresence>
+    </button>
+  );
+}
+
 export default function Header({ activeSection }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+
+    let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!themeColor) {
+      themeColor = document.createElement('meta');
+      themeColor.name = 'theme-color';
+      document.head.appendChild(themeColor);
+    }
+    themeColor.content = theme === 'dark' ? '#0b0e0c' : '#f4f6f2';
+  }, [theme]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,13 +94,8 @@ export default function Header({ activeSection }: HeaderProps) {
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-    const target = document.querySelector(href);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' });
-      setIsMobileMenuOpen(false);
-    } else {
-      window.location.href = `/${href}`;
-    }
+    setIsMobileMenuOpen(false);
+    navigateWithinSite(`/${href}`);
   };
 
   return (
@@ -52,7 +107,7 @@ export default function Header({ activeSection }: HeaderProps) {
         id="navbar"
         className={`fixed inset-x-0 top-0 z-50 px-5 py-4 transition-all duration-300 sm:px-8 ${
           isScrolled
-            ? 'border-b border-[var(--brand-line)] bg-[rgba(244,246,242,0.82)] shadow-[0_10px_40px_rgba(24,26,24,0.08)] backdrop-blur-xl'
+            ? 'border-b border-[var(--brand-line)] bg-[var(--brand-header-surface)] shadow-[var(--brand-shadow-soft)] backdrop-blur-xl'
             : 'bg-transparent'
         }`}
       >
@@ -62,8 +117,13 @@ export default function Header({ activeSection }: HeaderProps) {
             onClick={(e) => handleNavClick(e, '#home')}
             className="group flex items-center gap-3 font-sans text-[var(--brand-ink)]"
           >
-            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[#efeeea] transition-transform duration-300 group-hover:-translate-y-0.5">
-              <img src={BRAND_MARK} alt="Luka Imagines" className="h-full w-full bg-[#efeeea] object-cover" />
+            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg transition-transform duration-300 group-hover:-translate-y-0.5">
+              <span
+                className="brand-mark-glyph"
+                style={{ WebkitMaskImage: `url("${BRAND_MARK}")`, maskImage: `url("${BRAND_MARK}")` }}
+                role="img"
+                aria-label="Luka Imagines"
+              />
             </span>
             <div className="flex flex-col leading-none">
               <span className="text-sm font-bold">Luka Imagines</span>
@@ -82,7 +142,7 @@ export default function Header({ activeSection }: HeaderProps) {
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.href)}
                   className={`relative rounded-full px-3 py-2 text-xs font-semibold transition-colors duration-200 xl:px-4 ${
-                    isActive ? 'text-white' : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
+                    isActive ? 'text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
                   }`}
                 >
                   {isActive && (
@@ -99,6 +159,10 @@ export default function Header({ activeSection }: HeaderProps) {
           </nav>
 
           <div className="hidden items-center gap-3 lg:flex">
+            <ThemeToggle
+              theme={theme}
+              onToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
+            />
             <span className="status-pill flex items-center gap-2 px-3 py-2">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-success)]" />
               ხელმისაწვდომია სამუშაოდ
@@ -113,13 +177,20 @@ export default function Header({ activeSection }: HeaderProps) {
             </a>
           </div>
 
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="icon-button lg:hidden"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-2 lg:hidden">
+            <ThemeToggle
+              theme={theme}
+              onToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
+            />
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="icon-button"
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
       </motion.header>
 
@@ -141,7 +212,7 @@ export default function Header({ activeSection }: HeaderProps) {
                     href={item.href}
                     onClick={(e) => handleNavClick(e, item.href)}
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 ${
-                      isActive ? 'bg-[var(--brand-accent)] text-white' : 'text-[var(--brand-muted)] hover:bg-white/60 hover:text-[var(--brand-ink)]'
+                      isActive ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:bg-white/60 hover:text-[var(--brand-ink)]'
                     }`}
                   >
                     {item.label}

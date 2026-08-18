@@ -36,7 +36,7 @@ export default function Timeline() {
               <div key={exp.id} className="relative">
                 <span className={`absolute -left-[33px] top-7 h-4 w-4 rounded-full border-2 bg-[var(--brand-page)] transition-all duration-300 sm:-left-[41px] ${
                   isExpanded
-                    ? 'border-[var(--brand-accent)] shadow-[0_0_0_6px_rgba(36,72,61,0.12)]'
+                    ? 'border-[var(--brand-accent)] shadow-[var(--brand-accent-ring-shadow)]'
                     : 'border-[var(--brand-line-strong)]'
                 }`} />
 
@@ -61,7 +61,7 @@ export default function Timeline() {
                     <button
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-200 ${
                         isExpanded
-                          ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-white'
+                          ? 'border-[var(--brand-accent)] bg-[var(--brand-accent)] text-[var(--brand-on-accent)]'
                           : 'border-[var(--brand-line)] bg-white/50 text-[var(--brand-muted)]'
                       }`}
                       aria-label={isExpanded ? 'Collapse' : 'Expand'}

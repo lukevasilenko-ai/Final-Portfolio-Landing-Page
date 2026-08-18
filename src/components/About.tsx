@@ -51,7 +51,7 @@ export default function About() {
 
             <div className="surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-accent)] text-white">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-accent)] text-[var(--brand-on-accent)]">
                   <Cpu className="h-5 w-5" />
                 </div>
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--brand-soft)]">ღირებულება // 01</span>
@@ -66,7 +66,7 @@ export default function About() {
 
             <div className="surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-copper)] text-white">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-copper)] text-[var(--brand-on-accent)]">
                   <Award className="h-5 w-5" />
                 </div>
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--brand-soft)]">ღირებულება // 02</span>
@@ -121,7 +121,7 @@ export default function About() {
                       onClick={() => setActiveCategoryIndex(idx)}
                       className={`flex-1 rounded-md py-2 text-center font-mono text-xs font-bold transition-colors duration-200 ${
                         activeCategoryIndex === idx
-                          ? 'bg-[var(--brand-accent)] text-white'
+                          ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)]'
                           : 'text-[var(--brand-muted)] hover:bg-white hover:text-[var(--brand-ink)]'
                       }`}
                     >
@@ -153,7 +153,7 @@ export default function About() {
                           </span>
                           <span className="font-mono text-[11px] font-bold text-[var(--brand-muted)]">{skill.level}%</span>
                         </div>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-[rgba(24,26,24,0.08)]">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--brand-track)]">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${skill.level}%` }}
@@ -169,7 +169,7 @@ export default function About() {
             </div>
 
             <div className="mt-8 flex items-start gap-3 border-t border-[var(--brand-line)] pt-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(180,95,60,0.12)]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-copper-soft)]">
                 <Heart className="h-4 w-4 text-[var(--brand-copper)]" />
               </div>
               <p className="font-mono text-[11px] italic leading-7 text-[var(--brand-muted)]">

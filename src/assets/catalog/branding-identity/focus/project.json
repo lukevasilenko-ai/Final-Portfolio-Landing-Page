@@ -1,0 +1,80 @@
+{
+  "id": "behance-246573009",
+  "slug": "focus",
+  "title": "Focus · ფოკუსი",
+  "description": "",
+  "category": "branding-identity",
+  "author": {
+    "name": "Luka Imagines",
+    "location": "Georgia"
+  },
+  "publishedDate": "2026-03-27",
+  "publishedAt": "2026-03-27T23:19:53Z",
+  "source": {
+    "platform": "Behance",
+    "projectId": 246573009,
+    "projectSlug": "Focus-"
+  },
+  "tools": [
+    "Adobe Photoshop",
+    "Adobe Illustrator"
+  ],
+  "tags": [
+    "eyewear",
+    "glasses",
+    "optics",
+    "brand identity",
+    "branding",
+    "Optics Store",
+    "Logo Design",
+    "visual identity"
+  ],
+  "statsAtDownload": {
+    "capturedAt": "2026-08-09",
+    "appreciations": 1,
+    "views": 39,
+    "comments": 0
+  },
+  "assets": {
+    "localOnly": true,
+    "format": "webp",
+    "conversion": "lossless",
+    "cover": "cover.webp",
+    "images": [
+      { "file": "01.webp", "moduleId": 1425321089 },
+      { "file": "02.webp", "moduleId": 1425321055 },
+      { "file": "03.webp", "moduleId": 1425321057 },
+      { "file": "04.webp", "moduleId": 1425321059 },
+      { "file": "05.webp", "moduleId": 1425321061 },
+      { "file": "06.webp", "moduleId": 1425321063 },
+      { "file": "07.webp", "moduleId": 1425321065 },
+      { "file": "08.webp", "moduleId": 1425321067 },
+      { "file": "09.webp", "moduleId": 1425321043 },
+      { "file": "10.webp", "moduleId": 1425321083 },
+      { "file": "11.webp", "moduleId": 1425321069 },
+      { "file": "12.webp", "moduleId": 1425321071 },
+      { "file": "13.webp", "moduleId": 1425321045 },
+      { "file": "14.webp", "moduleId": 1425321073 },
+      { "file": "15.webp", "moduleId": 1425321075 },
+      { "file": "16.webp", "moduleId": 1425321077 },
+      { "file": "17.webp", "moduleId": 1425321047 },
+      { "file": "18.webp", "moduleId": 1425321049 },
+      { "file": "19.webp", "moduleId": 1425321051 },
+      { "file": "20.webp", "moduleId": 1425321079 },
+      { "file": "21.webp", "moduleId": 1425321101 },
+      { "file": "22.webp", "moduleId": 1425321085 },
+      { "file": "23.webp", "moduleId": 1425321081 },
+      { "file": "24.webp", "moduleId": 1425321087 },
+      { "file": "25.webp", "moduleId": 1425321053 },
+      { "file": "26.webp", "moduleId": 1425321091 },
+      { "file": "27.webp", "moduleId": 1425321103 },
+      { "file": "28.webp", "moduleId": 1425321111 },
+      { "file": "29.webp", "moduleId": 1425321099 },
+      { "file": "30.webp", "moduleId": 1425321093 },
+      { "file": "31.webp", "moduleId": 1425321105 },
+      { "file": "32.webp", "moduleId": 1425321097 },
+      { "file": "33.webp", "moduleId": 1425321095 },
+      { "file": "34.webp", "moduleId": 1425321109 }
+    ]
+  }
+}

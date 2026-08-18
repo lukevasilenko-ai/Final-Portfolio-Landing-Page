@@ -16,6 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { getPortfolioCategoryById } from '../data/portfolioItems';
+import { navigateWithinSite } from '../navigation';
 import { PortfolioItem } from '../types';
 
 interface PortfolioModalProps {
@@ -142,7 +143,7 @@ export default function PortfolioModal({
                     whileTap={{ scale: 0.94 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
                     onClick={() => onSelect(previousItem)}
-                    className="absolute left-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:left-6 sm:h-12 sm:w-12"
+                    className="absolute left-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--brand-line-strong)] bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:left-6 sm:h-12 sm:w-12"
                     aria-label="Previous portfolio image"
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -160,7 +161,7 @@ export default function PortfolioModal({
                     whileTap={{ scale: 0.94 }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
                     onClick={() => onSelect(nextItem)}
-                    className="absolute right-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:right-6 sm:h-12 sm:w-12"
+                    className="absolute right-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--brand-line-strong)] bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:right-6 sm:h-12 sm:w-12"
                     aria-label="Next portfolio image"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -173,7 +174,7 @@ export default function PortfolioModal({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 6, scale: 0.98 }}
                 transition={{ type: 'spring', damping: 30, stiffness: 260 }}
-                className="relative z-10 flex max-h-[94vh] max-w-[calc(100vw-2rem)] items-center justify-center overflow-hidden rounded-lg border border-white/25 bg-white/10 p-3 shadow-[0_36px_100px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:max-w-[calc(100vw-10rem)] sm:p-5"
+                className="relative z-10 flex max-h-[94vh] max-w-[calc(100vw-2rem)] items-center justify-center overflow-hidden rounded-lg border border-[rgba(255,255,255,0.25)] bg-white/10 p-3 shadow-[0_36px_100px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:max-w-[calc(100vw-10rem)] sm:p-5"
                 onClick={(event) => event.stopPropagation()}
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -192,7 +193,7 @@ export default function PortfolioModal({
                       className="absolute -inset-[15%] h-[130%] w-[130%] scale-110 object-cover opacity-90 blur-3xl saturate-[1.3]"
                     />
                     <div className="absolute inset-0 bg-[rgba(255,255,255,0.14)] backdrop-blur-xl" />
-                    <div className="absolute inset-0 ring-1 ring-inset ring-white/25" />
+                    <div className="absolute inset-0 ring-1 ring-inset ring-[rgba(255,255,255,0.25)]" />
                   </motion.div>
                 </AnimatePresence>
 
@@ -220,14 +221,14 @@ export default function PortfolioModal({
             >
               <div className="relative min-h-[300px] overflow-hidden bg-[var(--brand-page-soft)] lg:min-h-[640px]">
                 <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[rgba(24,26,24,0.34)] via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--brand-image-shade-soft)] via-transparent to-transparent" />
                 <span className="tag-chip absolute left-5 top-5 px-3 py-1.5">
                   {category.label}
                 </span>
               </div>
 
             <div className="flex max-h-[92vh] flex-col overflow-y-auto">
-              <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--brand-line)] bg-[rgba(255,255,252,0.9)] p-5 backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--brand-line)] bg-[var(--brand-canvas-90)] p-5 backdrop-blur-xl">
                 <div className="flex flex-col">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--brand-muted)]">
                     Portfolio preview
@@ -289,7 +290,15 @@ export default function PortfolioModal({
                   </div>
                 </div>
 
-                <a href="/#contact" className="button-primary w-full">
+                <a
+                  href="/#contact"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onClose();
+                    navigateWithinSite('/#contact');
+                  }}
+                  className="button-primary w-full"
+                >
                   მსგავს პროექტზე საუბარი
                 </a>
               </div>

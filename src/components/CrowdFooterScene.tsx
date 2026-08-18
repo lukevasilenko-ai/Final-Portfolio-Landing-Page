@@ -380,7 +380,17 @@ export function CrowdCanvas({
 
     const handlePointerLeave = () => setHighlightHover(false);
 
+    const updateHighlightedColor = () => {
+      if (!highlightedPeep) return;
+
+      const brandColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--brand-accent')
+        .trim() || '#24483d';
+      highlightedPeep.colorizedImage = createColorizedImage(highlightedPeep.rect, brandColor);
+    };
+
     const resizeObserver = new ResizeObserver(resize);
+    const themeObserver = new MutationObserver(updateHighlightedColor);
     const visibilityObserver = new IntersectionObserver(([entry]) => {
       isVisible = entry.isIntersecting;
       updatePausedState();
@@ -396,6 +406,10 @@ export function CrowdCanvas({
     image.src = src;
 
     resizeObserver.observe(canvas);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
     visibilityObserver.observe(canvas);
     reducedMotion.addEventListener('change', updatePausedState);
     canvas.addEventListener('pointermove', handlePointerMove);
@@ -404,6 +418,7 @@ export function CrowdCanvas({
     return () => {
       image.onload = null;
       resizeObserver.disconnect();
+      themeObserver.disconnect();
       visibilityObserver.disconnect();
       reducedMotion.removeEventListener('change', updatePausedState);
       canvas.removeEventListener('pointermove', handlePointerMove);
@@ -437,7 +452,7 @@ export default function CrowdFooterScene() {
   return (
     <section
       aria-label="მოძრავი ილუსტრაციების სცენა"
-      className="content-layer section-rule relative isolate h-[560px] overflow-hidden bg-[rgba(36,72,61,0.035)] sm:h-[620px] lg:h-[650px]"
+      className="content-layer section-rule relative isolate h-[560px] overflow-hidden bg-[var(--brand-accent-faint)] sm:h-[620px] lg:h-[650px]"
     >
       <div className="container-xl relative z-10 flex justify-center px-5 pt-16 text-center sm:px-8">
         <h2 className="text-[48px] font-extrabold leading-[1.08] text-[var(--brand-ink)] sm:text-[56px]">
@@ -461,13 +476,13 @@ export default function CrowdFooterScene() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 6 }}
                 transition={{ type: 'spring', stiffness: 340, damping: 25 }}
-                className="relative w-[260px] max-w-[calc(100vw-32px)] rounded-lg border border-[var(--brand-line-strong)] bg-[rgba(255,255,252,0.94)] px-5 py-4 text-center shadow-[var(--brand-shadow-soft)] backdrop-blur-md"
+                className="relative w-[260px] max-w-[calc(100vw-32px)] rounded-lg border border-[var(--brand-line-strong)] bg-[var(--brand-canvas-94)] px-5 py-4 text-center shadow-[var(--brand-shadow-soft)] backdrop-blur-md"
               >
                 <p className="text-sm font-medium leading-6 text-[var(--brand-ink)]">
                   {thoughtBubble.message}
                 </p>
-                <span className="absolute -bottom-3 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border border-[var(--brand-line-strong)] bg-[rgba(255,255,252,0.96)]" />
-                <span className="absolute -bottom-6 left-[54%] h-2 w-2 rounded-full border border-[var(--brand-line-strong)] bg-[rgba(255,255,252,0.96)]" />
+                <span className="absolute -bottom-3 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border border-[var(--brand-line-strong)] bg-[var(--brand-canvas-96)]" />
+                <span className="absolute -bottom-6 left-[54%] h-2 w-2 rounded-full border border-[var(--brand-line-strong)] bg-[var(--brand-canvas-96)]" />
               </motion.div>
             </div>
           )}

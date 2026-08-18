@@ -146,7 +146,7 @@ export default function Contact() {
                   rel="noreferrer"
                   className="group flex items-center gap-3 text-sm font-semibold text-[var(--brand-ink)]"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[rgba(36,72,61,0.1)] text-[var(--brand-accent)]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                     <Mail className="h-4 w-4" />
                   </div>
                   <div className="flex min-w-0 flex-col leading-tight">
@@ -162,7 +162,7 @@ export default function Contact() {
                   href="tel:+995595213216"
                   className="group flex items-center gap-3 text-sm font-semibold text-[var(--brand-ink)]"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[rgba(36,72,61,0.1)] text-[var(--brand-accent)]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                     <Phone className="h-4 w-4" />
                   </div>
                   <div className="flex min-w-0 flex-col leading-tight">
@@ -175,7 +175,7 @@ export default function Contact() {
                 </a>
 
                 <div className="flex items-center gap-3 text-sm text-[var(--brand-ink)]">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[rgba(180,95,60,0.12)] text-[var(--brand-copper)]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-copper-soft)] text-[var(--brand-copper)]">
                     <MessageSquare className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col leading-tight">
@@ -255,7 +255,7 @@ export default function Contact() {
               >
                 {isSubmitting ? (
                   <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <div className="button-spinner h-4 w-4 animate-spin rounded-full border-2" />
                     უსაფრთხოდ იგზავნება...
                   </>
                 ) : (
@@ -273,9 +273,9 @@ export default function Contact() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute inset-x-6 bottom-6 flex items-start gap-3 rounded-lg border border-[rgba(40,118,95,0.28)] bg-[rgba(255,255,252,0.92)] p-4 text-[var(--brand-ink)] shadow-[var(--brand-shadow)] backdrop-blur-xl sm:inset-x-8 sm:bottom-8"
+                  className="absolute inset-x-6 bottom-6 flex items-start gap-3 rounded-lg border border-[var(--brand-success-line)] bg-[var(--brand-canvas-92)] p-4 text-[var(--brand-ink)] shadow-[var(--brand-shadow)] backdrop-blur-xl sm:inset-x-8 sm:bottom-8"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-success)] text-white">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-success)] text-[var(--brand-on-accent)]">
                     <Check className="h-5 w-5 stroke-[3px]" />
                   </div>
                   <div className="flex flex-col">
@@ -359,7 +359,7 @@ export default function Contact() {
                         <button
                           onClick={clearAllMessages}
                           disabled={messagesList.length === 0}
-                          className="flex items-center gap-2 rounded-lg border border-[rgba(175,61,56,0.24)] bg-[rgba(175,61,56,0.08)] px-3.5 py-2 text-xs font-semibold text-[var(--brand-danger)] transition-colors hover:bg-[rgba(175,61,56,0.14)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex items-center gap-2 rounded-lg border border-[var(--brand-danger-line)] bg-[var(--brand-danger-soft)] px-3.5 py-2 text-xs font-semibold text-[var(--brand-danger)] transition-colors hover:bg-[var(--brand-danger-soft-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           ბაზის გასუფთავება
@@ -397,7 +397,7 @@ export default function Contact() {
                               <span className="font-mono text-[10px] font-bold text-[var(--brand-muted)]">{msg.timestamp}</span>
                               <button
                                 onClick={() => deleteMessage(msg.id)}
-                                className="rounded-lg border border-transparent p-2 text-[var(--brand-danger)] transition-colors hover:border-[rgba(175,61,56,0.24)] hover:bg-[rgba(175,61,56,0.08)]"
+                                className="rounded-lg border border-transparent p-2 text-[var(--brand-danger)] transition-colors hover:border-[var(--brand-danger-line)] hover:bg-[var(--brand-danger-soft)]"
                                 aria-label="Delete message record"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

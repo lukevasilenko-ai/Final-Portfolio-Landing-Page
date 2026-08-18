@@ -101,8 +101,13 @@ export default function App() {
       <footer className="content-layer section-rule px-5 py-10 sm:px-8">
         <div className="container-xl flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[#efeeea] shadow-sm">
-              <img src={BRAND_MARK} alt="Luka Imagines" className="h-full w-full bg-[#efeeea] object-cover" />
+            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg">
+              <span
+                className="brand-mark-glyph"
+                style={{ WebkitMaskImage: `url("${BRAND_MARK}")`, maskImage: `url("${BRAND_MARK}")` }}
+                role="img"
+                aria-label="Luka Imagines"
+              />
             </span>
             <div className="flex flex-col">
               <span className="text-sm font-bold leading-none text-[var(--brand-ink)]">Luka Imagines</span>
