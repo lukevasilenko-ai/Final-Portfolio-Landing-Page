@@ -14,6 +14,7 @@ import PortfolioCatalogPage from './components/PortfolioCatalogPage';
 import LoadingScreen from './components/LoadingScreen';
 import CustomCursor from './components/CustomCursor';
 import CrowdFooterScene from './components/CrowdFooterScene';
+import AIAssistantLauncher from './components/AIAssistantLauncher';
 import { ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BRAND_MARK } from './data';
@@ -98,6 +99,8 @@ export default function App() {
 
       <CrowdFooterScene />
 
+      <AIAssistantLauncher />
+
       <footer className="content-layer section-rule px-5 py-10 sm:px-8">
         <div className="container-xl flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
@@ -130,7 +133,7 @@ export default function App() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 12 }}
             onClick={handleScrollToTop}
-            className="button-primary fixed bottom-6 right-6 z-40 h-11 w-11 p-0"
+            className="button-primary fixed bottom-6 right-[11.25rem] z-40 h-11 w-11 p-0"
             aria-label="Scroll to top"
           >
             <ArrowUp className="h-4 w-4" />
