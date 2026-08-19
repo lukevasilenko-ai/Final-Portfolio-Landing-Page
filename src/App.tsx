@@ -14,7 +14,6 @@ import PortfolioCatalogPage from './components/PortfolioCatalogPage';
 import LoadingScreen from './components/LoadingScreen';
 import CustomCursor from './components/CustomCursor';
 import CrowdFooterScene from './components/CrowdFooterScene';
-import AIAssistantLauncher from './components/AIAssistantLauncher';
 import { ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BRAND_MARK } from './data';
@@ -98,8 +97,6 @@ export default function App() {
       )}
 
       <CrowdFooterScene />
-
-      <AIAssistantLauncher />
 
       <footer className="content-layer section-rule px-5 py-10 sm:px-8">
         <div className="container-xl flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">

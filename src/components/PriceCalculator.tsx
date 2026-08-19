@@ -15,6 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import ServicePackages from './ServicePackages';
 
 type ServiceId =
   | 'poster'
@@ -498,6 +499,8 @@ export default function PriceCalculator() {
             </a>
           </div>
         </div>
+
+        <ServicePackages />
       </div>
     </section>
   );
