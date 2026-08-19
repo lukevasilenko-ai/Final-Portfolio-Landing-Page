@@ -11,10 +11,6 @@ import {
   Phone,
   MessageSquare,
   Check,
-  Lock,
-  Unlock,
-  Trash2,
-  AlertCircle,
   Sparkles,
   ArrowUpRight
 } from 'lucide-react';
@@ -28,11 +24,7 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [messagesList, setMessagesList] = useState<ContactMessage[]>([]);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('luke-portfolio-messages');
@@ -84,27 +76,6 @@ export default function Contact() {
       }, 5000);
 
     }, 1200);
-  };
-
-  const handleAdminUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === 'luke2026' || adminPassword.toLowerCase() === 'demo') {
-      setIsAdminUnlocked(true);
-      setPasswordError('');
-    } else {
-      setPasswordError('არასწორი პაროლი. რჩევა: გამოიყენეთ "demo" ან "luke2026"');
-    }
-  };
-
-  const deleteMessage = (id: string) => {
-    const updated = messagesList.filter(msg => msg.id !== id);
-    setMessagesList(updated);
-    localStorage.setItem('luke-portfolio-messages', JSON.stringify(updated));
-  };
-
-  const clearAllMessages = () => {
-    setMessagesList([]);
-    localStorage.removeItem('luke-portfolio-messages');
   };
 
   return (
@@ -283,7 +254,7 @@ export default function Contact() {
                       შეტყობინება წარმატებით გაიგზავნა
                       <Sparkles className="h-4 w-4 text-[var(--brand-copper)]" />
                     </p>
-                    <p className="mt-1 text-xs leading-6 text-[var(--brand-muted)]">თქვენი შეტყობინება შენახულია localStorage-ში. შესამოწმებლად გახსენით ქვემოთ მოცემული ბაზის ლოგები!</p>
+                    <p className="mt-1 text-xs leading-6 text-[var(--brand-muted)]">თქვენი შეტყობინება წარმატებით დამუშავდა. პასუხს მალე მიიღებთ.</p>
                   </div>
                 </motion.div>
               )}
@@ -291,128 +262,6 @@ export default function Contact() {
           </div>
         </div>
 
-        <div className="surface-card mt-10 overflow-hidden">
-          <div
-            onClick={() => setShowAdminPanel(!showAdminPanel)}
-            className="flex cursor-pointer items-center justify-between gap-4 border-b border-[var(--brand-line)] bg-white/45 px-5 py-4 transition-colors hover:bg-white/70 sm:px-6"
-          >
-            <div className="flex items-center gap-3">
-              {isAdminUnlocked ? <Unlock className="h-4 w-4 text-[var(--brand-accent)]" /> : <Lock className="h-4 w-4 text-[var(--brand-muted)]" />}
-              <span className="font-mono text-xs font-bold text-[var(--brand-ink)]">
-                დეველოპერის კომპილატორი და შეტყობინებების ლოგი (EASTER EGG)
-              </span>
-            </div>
-
-            <button className="font-mono text-xs font-bold text-[var(--brand-muted)] underline-offset-4 hover:text-[var(--brand-ink)] hover:underline">
-              {showAdminPanel ? 'ლოგების დახურვა' : 'ლოგების ჩვენება'}
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {showAdminPanel && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
-              >
-                {!isAdminUnlocked ? (
-                  <form onSubmit={handleAdminUnlock} className="flex max-w-xl flex-col gap-4 p-6 sm:p-8">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--brand-ink)]">
-                        <AlertCircle className="h-4 w-4 text-[var(--brand-copper)]" />
-                        <span>ინტერაქტიული შენახვის ვერიფიკაცია</span>
-                      </div>
-                      <p className="text-sm leading-7 text-[var(--brand-muted)]">
-                        იმის დასამტკიცებლად, რომ ეს არ არის სიმულირებული შაბლონი, შეტყობინებები ინახება კლიენტის ლოკალურ მეხსიერებაში (LocalStorage). განბლოკეთ ბაზის ლოგები თქვენი შეტყობინებების სანახავად.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <input
-                        type="password"
-                        required
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="რჩევა: ჩაწერეთ 'demo' ან 'luke2026'"
-                        className="field-control"
-                      />
-                      <button type="submit" className="button-primary shrink-0 text-xs">
-                        ლოგების განბლოკვა
-                      </button>
-                    </div>
-
-                    {passwordError && (
-                      <p className="font-mono text-[11px] font-semibold text-[var(--brand-danger)]">{passwordError}</p>
-                    )}
-                  </form>
-                ) : (
-                  <div className="flex flex-col gap-6 p-6 sm:p-8">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--brand-line)] pb-4">
-                      <div className="flex items-center gap-2 font-mono text-xs">
-                        <span className="h-2 w-2 rounded-full bg-[var(--brand-success)]" />
-                        <span className="font-bold text-[var(--brand-ink)]">LOCALSTORE_ბაზა // აქტიური_შეტყობინებები: {messagesList.length}</span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={clearAllMessages}
-                          disabled={messagesList.length === 0}
-                          className="flex items-center gap-2 rounded-lg border border-[var(--brand-danger-line)] bg-[var(--brand-danger-soft)] px-3.5 py-2 text-xs font-semibold text-[var(--brand-danger)] transition-colors hover:bg-[var(--brand-danger-soft-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          ბაზის გასუფთავება
-                        </button>
-                        <button
-                          onClick={() => setIsAdminUnlocked(false)}
-                          className="button-secondary gap-2 text-xs"
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                          ლოგების ჩაკეტვა
-                        </button>
-                      </div>
-                    </div>
-
-                    {messagesList.length === 0 ? (
-                      <div className="flex flex-col items-center gap-2 py-10 text-center text-[var(--brand-muted)]">
-                        <MessageSquare className="h-8 w-8 text-[var(--brand-accent)]" />
-                        <p className="font-mono text-xs">შეტყობინებები კლიენტის ლოკალურ მეხსიერებაში ვერ მოიძებნა.</p>
-                        <p className="text-sm">გამოაგზავნეთ შეტყობინება ზემოთ მოცემული ფორმიდან და ის მომენტალურად გამოჩნდება აქ!</p>
-                      </div>
-                    ) : (
-                      <div className="flex max-h-[350px] flex-col gap-4 overflow-y-auto pr-2">
-                        {messagesList.map((msg) => (
-                          <div key={msg.id} className="flex flex-col justify-between gap-4 rounded-lg border border-[var(--brand-line)] bg-white/55 p-4 transition-colors hover:bg-white/75 sm:flex-row">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <span className="text-sm font-bold text-[var(--brand-ink)]">{msg.name}</span>
-                                <span className="font-mono text-[10px] text-[var(--brand-muted)]">({msg.email})</span>
-                              </div>
-                              <p className="font-mono text-[11px] font-semibold uppercase text-[var(--brand-accent)]">თემა: {msg.subject}</p>
-                              <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-[var(--brand-muted)]">{msg.message}</p>
-                            </div>
-
-                            <div className="flex shrink-0 items-end justify-between gap-2 sm:flex-col sm:items-end sm:justify-start">
-                              <span className="font-mono text-[10px] font-bold text-[var(--brand-muted)]">{msg.timestamp}</span>
-                              <button
-                                onClick={() => deleteMessage(msg.id)}
-                                className="rounded-lg border border-transparent p-2 text-[var(--brand-danger)] transition-colors hover:border-[var(--brand-danger-line)] hover:bg-[var(--brand-danger-soft)]"
-                                aria-label="Delete message record"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </div>
     </section>
   );

@@ -5,6 +5,7 @@
 
 import { ArrowUpRight, Check, Info, Star } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import { randomizeFrameGlow } from './randomizeFrameGlow';
 
 interface ServicePackage {
   name: string;
@@ -52,7 +53,7 @@ const servicePackages: ServicePackage[] = [
   },
   {
     name: 'Premium',
-    price: 1500,
+    price: 1700,
     summary: '10-11 სოციალური მედიის დიზაინი',
     accent: 'plum',
     features: [
@@ -131,11 +132,12 @@ export default function ServicePackages() {
                 delay: reduceMotion ? 0 : packageIndex * 0.09,
                 ease: smoothEase
               }}
-              className={`surface-card group relative flex h-full flex-col overflow-visible p-6 sm:p-7 ${
+              className={`random-glow-frame surface-card group relative flex h-full flex-col overflow-visible p-6 sm:p-7 ${
                 servicePackage.popular
                   ? 'border-[var(--brand-accent)] shadow-[var(--brand-shadow)]'
                   : 'hover:border-[var(--brand-line-strong)] hover:shadow-[var(--brand-shadow)]'
               }`}
+              onPointerEnter={(event) => randomizeFrameGlow(event.currentTarget)}
               aria-labelledby={`package-${servicePackage.name.toLowerCase()}`}
             >
               <motion.span

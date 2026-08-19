@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowDown, Facebook, Instagram, Mail, Clock, MapPin, Sparkles } from 'lucide-react';
+import { ArrowDown, Facebook, Mail, Clock, MapPin, Sparkles } from 'lucide-react';
 import { HERO_ARTWORK } from '../data';
+import WhatsAppIcon from './WhatsAppIcon';
 
 export default function Hero() {
   const [time, setTime] = useState(new Date());
@@ -82,13 +83,13 @@ export default function Hero() {
                 <Facebook className="h-4 w-4" />
               </a>
               <a
-                href="https://www.instagram.com/lukaaa.1.7/"
+                href="https://wa.me/995595213216"
                 target="_blank"
                 rel="noreferrer"
                 className="icon-button"
-                aria-label="Instagram Profile"
+                aria-label="WhatsApp Chat"
               >
-                <Instagram className="h-4 w-4" />
+                <WhatsAppIcon className="h-4 w-4" />
               </a>
               <a
                 href="https://mail.google.com/mail/?view=cm&fs=1&to=lukevasilenko%40gmail.com"

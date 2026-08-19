@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Cpu, Award, Zap, Heart, CheckCircle2 } from 'lucide-react';
 import { SKILL_CATEGORIES } from '../data';
+import { randomizeFrameGlow } from './randomizeFrameGlow';
 
 export default function About() {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
@@ -49,7 +50,10 @@ export default function About() {
               </div>
             </div>
 
-            <div className="surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1">
+            <div
+              className="random-glow-frame surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1"
+              onPointerEnter={(event) => randomizeFrameGlow(event.currentTarget)}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-accent)] text-[var(--brand-on-accent)]">
                   <Cpu className="h-5 w-5" />
@@ -64,7 +68,10 @@ export default function About() {
               </div>
             </div>
 
-            <div className="surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1">
+            <div
+              className="random-glow-frame surface-card flex min-h-[220px] flex-col justify-between p-6 transition-transform duration-200 hover:-translate-y-1"
+              onPointerEnter={(event) => randomizeFrameGlow(event.currentTarget)}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--brand-copper)] text-[var(--brand-on-accent)]">
                   <Award className="h-5 w-5" />
