@@ -8,8 +8,8 @@ import { PortfolioCategory, PortfolioCategoryId } from '../types';
 export const ALL_PORTFOLIO_CATEGORY: PortfolioCategory = {
   id: 'all',
   slug: 'all',
-  label: 'All',
-  description: 'ყველა category folder-ის ფოტო ერთ კატალოგში.'
+  label: 'ყველა',
+  description: 'ყველა მიმართულების ფოტო და პროექტი ერთ კატალოგში.'
 };
 
 export const PORTFOLIO_CATEGORIES: PortfolioCategory[] = [
@@ -25,14 +25,14 @@ export const PORTFOLIO_CATEGORIES: PortfolioCategory[] = [
     slug: 'branding',
     label: 'Branding & Identity',
     folderName: 'src/assets/catalog/branding-identity',
-    description: 'ლოგოების, ბრენდინგისა და identity დიზაინების ფოტო-კატალოგი.'
+    description: 'ლოგოების, ბრენდინგისა და ვიზუალური იდენტობის პროექტები.'
   },
   {
     id: 'billboards-print',
     slug: 'billboards-print',
     label: 'Billboards & Print',
     folderName: 'src/assets/catalog/billboards-print',
-    description: 'ბილბორდებისა და print მასალების ფოტო-კატალოგი.'
+    description: 'ბილბორდებისა და სხვა საბეჭდი მასალების ნამუშევრები.'
   }
 ];
 

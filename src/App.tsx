@@ -3,26 +3,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useState, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import About from './components/About';
 import Projects from './components/Projects';
+import CreativeBriefStudio from './components/CreativeBriefStudio';
 import PriceCalculator from './components/PriceCalculator';
 import Contact from './components/Contact';
-import PortfolioCatalogPage from './components/PortfolioCatalogPage';
 import LoadingScreen from './components/LoadingScreen';
 import CustomCursor from './components/CustomCursor';
-import CrowdFooterScene from './components/CrowdFooterScene';
+import LazyCrowdFooterScene from './components/LazyCrowdFooterScene';
 import { ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BRAND_MARK } from './data';
 
+const PortfolioCatalogPage = lazy(() => import('./components/PortfolioCatalogPage'));
+const AdminPanel = lazy(() => import('./admin/AdminPanel'));
+
+function CatalogPageFallback() {
+  return (
+    <main id="main-content" tabIndex={-1} className="content-layer min-h-screen px-5 pt-36 outline-none sm:px-8">
+      <div className="container-xl" role="status" aria-live="polite">
+        <div className="flex items-center gap-3 border-b border-[var(--brand-line)] pb-8 text-sm font-semibold text-[var(--brand-muted)]">
+          <span className="button-spinner h-4 w-4 animate-spin rounded-full border-2" />
+          კატალოგი იტვირთება...
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
+  const currentYear = new Date().getFullYear();
   const [activeSection, setActiveSection] = useState('home');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
+  const isAdminPage = routePath.replace(/\/+$/, '') === '/admin';
   const isPortfolioPage = routePath.startsWith('/portfolio');
 
   useEffect(() => {
@@ -38,7 +56,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const sections = ['home', 'about', 'projects', 'calculator', 'contact'];
+    const sections = [
+      { id: 'home', activeId: 'home' },
+      { id: 'about', activeId: 'about' },
+      { id: 'projects', activeId: 'projects' },
+      { id: 'brief-studio', activeId: 'calculator' },
+      { id: 'calculator', activeId: 'calculator' },
+      { id: 'contact', activeId: 'contact' }
+    ];
 
     const handleScroll = () => {
       setShowScrollTop(window.scrollY > 500);
@@ -46,13 +71,13 @@ export default function App() {
       let currentSection = 'home';
       const scrollPosition = window.scrollY + 200;
 
-      for (const sectionId of sections) {
-        const el = document.getElementById(sectionId);
+      for (const section of sections) {
+        const el = document.getElementById(section.id);
         if (el) {
           const top = el.offsetTop;
           const height = el.offsetHeight;
           if (scrollPosition >= top && scrollPosition < top + height) {
-            currentSection = sectionId;
+            currentSection = section.activeId;
             break;
           }
         }
@@ -72,10 +97,49 @@ export default function App() {
 
   const handleLoadingComplete = useCallback(() => {
     setShowLoadingScreen(false);
+
+    if (!window.location.hash) return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+        target?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      });
+    });
   }, []);
+
+  if (isAdminPage) {
+    return (
+      <Suspense
+        fallback={
+          <main
+            lang="ka-GE"
+            role="status"
+            aria-live="polite"
+            style={{
+              display: 'grid',
+              minHeight: '100vh',
+              placeItems: 'center',
+              color: 'var(--brand-ink)',
+              background: 'var(--brand-page)',
+              fontFamily: 'var(--brand-font-sans)',
+            }}
+          >
+            პანელი იტვირთება...
+          </main>
+        }
+      >
+        <AdminPanel />
+      </Suspense>
+    );
+  }
 
   return (
     <div id="app-root" className="site-shell">
+      <a href="#main-content" className="skip-link">
+        მთავარ შინაარსზე გადასვლა
+      </a>
+
       <CustomCursor />
 
       <AnimatePresence>
@@ -85,18 +149,21 @@ export default function App() {
       <Header activeSection={isPortfolioPage ? 'projects' : activeSection} />
 
       {isPortfolioPage ? (
-        <PortfolioCatalogPage />
+        <Suspense fallback={<CatalogPageFallback />}>
+          <PortfolioCatalogPage />
+        </Suspense>
       ) : (
-        <main className="content-layer">
+        <main id="main-content" tabIndex={-1} className="content-layer outline-none">
           <Hero />
           <About />
           <Projects />
+          <CreativeBriefStudio />
           <PriceCalculator />
           <Contact />
         </main>
       )}
 
-      <CrowdFooterScene />
+      <LazyCrowdFooterScene />
 
       <footer className="content-layer section-rule px-5 py-10 sm:px-8">
         <div className="container-xl flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
@@ -118,7 +185,7 @@ export default function App() {
           </div>
 
           <p className="max-w-md text-left font-mono text-xs leading-relaxed text-[var(--brand-muted)] md:text-right">
-            © 2026 Luka Imagines. შექმნილია React 19-ის, TypeScript-ისა და Tailwind CSS v4-ის გამოყენებით. დამზადებულია Frosted Glass-ის დიზაინის პრინციპებით.
+            © {currentYear} Luka Imagines. გრაფიკული დიზაინი, ბრენდინგი და ვიზუალური იდენტობა.
           </p>
         </div>
       </footer>
@@ -130,8 +197,9 @@ export default function App() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 12 }}
             onClick={handleScrollToTop}
-            className="button-primary fixed bottom-6 right-[11.25rem] z-40 h-11 w-11 p-0"
-            aria-label="Scroll to top"
+            className="scroll-to-top button-primary fixed z-40 h-11 w-11 p-0"
+            aria-label="გვერდის დასაწყისში დაბრუნება"
+            title="გვერდის დასაწყისში დაბრუნება"
           >
             <ArrowUp className="h-4 w-4" />
           </motion.button>

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -24,6 +24,7 @@ interface PortfolioModalProps {
   items?: PortfolioItem[];
   onClose: () => void;
   onSelect?: (item: PortfolioItem) => void;
+  onImageError?: (item: PortfolioItem, retry?: boolean) => void;
   imageOnly?: boolean;
 }
 
@@ -32,16 +33,23 @@ export default function PortfolioModal({
   items = [],
   onClose,
   onSelect,
+  onImageError,
   imageOnly = false
 }: PortfolioModalProps) {
-  const category = item ? getPortfolioCategoryById(item.category) : null;
+  const baseCategory = item ? getPortfolioCategoryById(item.category) : null;
+  const category = item && baseCategory
+    ? { ...baseCategory, label: item.categoryLabel ?? baseCategory.label }
+    : null;
   const tags = item?.tags ?? [];
+  const [hasImageError, setHasImageError] = useState(false);
   const selectedIndex = item ? items.findIndex((candidate) => candidate.id === item.id) : -1;
   const previousItem = selectedIndex > 0 ? items[selectedIndex - 1] : null;
   const nextItem = selectedIndex >= 0 && selectedIndex < items.length - 1
     ? items[selectedIndex + 1]
     : null;
   const isOpen = Boolean(item);
+
+  useEffect(() => setHasImageError(false), [item?.image]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -191,6 +199,7 @@ export default function PortfolioModal({
                       src={item.image}
                       alt=""
                       className="absolute -inset-[15%] h-[130%] w-[130%] scale-110 object-cover opacity-90 blur-3xl saturate-[1.3]"
+                      onError={(event) => { event.currentTarget.hidden = true; }}
                     />
                     <div className="absolute inset-0 bg-[rgba(255,255,255,0.14)] backdrop-blur-xl" />
                     <div className="absolute inset-0 ring-1 ring-inset ring-[rgba(255,255,255,0.25)]" />
@@ -198,16 +207,24 @@ export default function PortfolioModal({
                 </AnimatePresence>
 
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.img
-                    key={item.id}
-                    src={item.image}
-                    alt={item.title}
-                    initial={{ opacity: 0, scale: 0.985 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.99 }}
-                    transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="relative z-10 block max-h-[calc(94vh-1.5rem)] max-w-[calc(100vw-3.5rem)] rounded-[4px] object-contain shadow-[0_18px_50px_rgba(0,0,0,0.24)] sm:max-h-[calc(94vh-2.5rem)] sm:max-w-[calc(100vw-12.5rem)]"
-                  />
+                  {hasImageError && onImageError ? (
+                    <div className="relative z-10 flex min-h-48 min-w-48 flex-col items-center justify-center gap-3 rounded-[4px] bg-[var(--brand-page)] p-8 text-center text-sm text-[var(--brand-muted)]">
+                      <span>სურათის ჩატვირთვა ვერ მოხერხდა</span>
+                      <button type="button" className="button-secondary" onClick={() => { setHasImageError(false); onImageError(item, true); }}>ხელახლა ცდა</button>
+                    </div>
+                  ) : (
+                    <motion.img
+                      key={item.id}
+                      src={item.image}
+                      alt={item.title}
+                      initial={{ opacity: 0, scale: 0.985 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.99 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
+                      className="relative z-10 block max-h-[calc(94vh-1.5rem)] max-w-[calc(100vw-3.5rem)] rounded-[4px] object-contain shadow-[0_18px_50px_rgba(0,0,0,0.24)] sm:max-h-[calc(94vh-2.5rem)] sm:max-w-[calc(100vw-12.5rem)]"
+                      onError={() => { setHasImageError(true); onImageError?.(item); }}
+                    />
+                  )}
                 </AnimatePresence>
               </motion.div>
             </>
@@ -220,7 +237,11 @@ export default function PortfolioModal({
               className="surface-card-strong relative z-10 grid max-h-[92vh] w-full max-w-5xl grid-cols-1 overflow-hidden lg:grid-cols-[1.15fr_0.85fr]"
             >
               <div className="relative min-h-[300px] overflow-hidden bg-[var(--brand-page-soft)] lg:min-h-[640px]">
-                <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+                {hasImageError && onImageError ? (
+                  <div className="flex min-h-[300px] items-center justify-center p-8 text-center text-sm text-[var(--brand-muted)]">სურათის ჩატვირთვა ვერ მოხერხდა</div>
+                ) : (
+                  <img src={item.image} alt={item.title} className="h-full w-full object-cover" onError={() => { setHasImageError(true); onImageError?.(item); }} />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[var(--brand-image-shade-soft)] via-transparent to-transparent" />
                 <span className="tag-chip absolute left-5 top-5 px-3 py-1.5">
                   {category.label}

@@ -3,19 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ImageIcon } from 'lucide-react';
 import {
-  getPortfolioCategoryById,
   getPortfolioCategoryBySlug
 } from '../data/portfolioItems';
 import {
   getPortfolioProject,
   PORTFOLIO_FILTERS_WITH_COUNTS,
-  PORTFOLIO_ITEMS
+  PORTFOLIO_ITEMS,
+  PORTFOLIO_PROJECTS
 } from '../data/catalogImages';
-import {
+import type { SupabaseCatalog } from '../data/supabaseCatalog';
+import type {
   PortfolioCategory,
   PortfolioCategoryId,
   PortfolioItem,
@@ -49,15 +50,39 @@ const navigateToCategory = (categoryId: PortfolioCategoryId, slug: string) => {
 };
 
 const navigateToProject = (categoryId: PortfolioItemCategory, projectSlug: string) => {
-  const category = getPortfolioCategoryById(categoryId);
-  navigateWithinSite(`/portfolio/${category.slug}/${projectSlug}`);
+  navigateWithinSite(`/portfolio/${categoryId}/${projectSlug}`);
 };
 
 export default function PortfolioCatalogPage() {
-  const categories = PORTFOLIO_FILTERS_WITH_COUNTS;
-  const items = PORTFOLIO_ITEMS;
+  const useSupabaseSource = import.meta.env.VITE_PUBLIC_CATALOG_SOURCE === 'supabase';
+  const [remoteCatalog, setRemoteCatalog] = useState<SupabaseCatalog | null>(null);
+  const [isLoading, setIsLoading] = useState(useSupabaseSource);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const categories = useSupabaseSource ? remoteCatalog?.categories ?? [] : PORTFOLIO_FILTERS_WITH_COUNTS;
+  const items = useSupabaseSource ? remoteCatalog?.items ?? [] : PORTFOLIO_ITEMS;
+  const projectDetails = useSupabaseSource ? remoteCatalog?.projects ?? [] : PORTFOLIO_PROJECTS;
   const [route, setRoute] = useState<PortfolioRoute>(getPortfolioRoute);
   const [selectedImage, setSelectedImage] = useState<PortfolioItem | null>(null);
+  const [failedImagePaths, setFailedImagePaths] = useState<Set<string>>(() => new Set());
+  const imageRefreshAttempts = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    if (!useSupabaseSource) return;
+    let active = true;
+    setIsLoading(true);
+    setErrorMessage('');
+    void import('../data/supabaseCatalog')
+      .then(({ loadSupabaseCatalog }) => loadSupabaseCatalog())
+      .then((catalog) => { if (active) setRemoteCatalog(catalog); })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setRemoteCatalog(null);
+        setErrorMessage(error instanceof Error ? error.message : 'კატალოგის ჩატვირთვა ვერ მოხერხდა.');
+      })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [reloadKey, useSupabaseSource]);
 
   useEffect(() => {
     const updateRoute = () => {
@@ -80,7 +105,9 @@ export default function PortfolioCatalogPage() {
   );
   const selectedCategory = activeCategory.id;
   const activeProject = route.projectSlug && selectedCategory !== 'all'
-    ? getPortfolioProject(selectedCategory, route.projectSlug)
+    ? useSupabaseSource
+      ? projectDetails.find((project) => project.category === selectedCategory && project.slug === route.projectSlug)
+      : getPortfolioProject(selectedCategory, route.projectSlug)
     : undefined;
 
   const visibleItems = useMemo(
@@ -95,6 +122,21 @@ export default function PortfolioCatalogPage() {
     () => visibleItems.filter((item) => item.kind !== 'project'),
     [visibleItems]
   );
+  const reload = useCallback(() => setReloadKey((value) => value + 1), []);
+  const refreshImage = useCallback(async (path: string) => {
+    const { refreshSupabaseImageUrl } = await import('../data/supabaseCatalog');
+    const signedUrl = await refreshSupabaseImageUrl(path);
+    setRemoteCatalog((current) => current ? {
+      ...current,
+      items: current.items.map((item) => item.imagePath === path ? { ...item, image: signedUrl } : item),
+      projects: current.projects.map((project) => ({
+        ...project,
+        cover: project.coverPath === path ? signedUrl : project.cover,
+        images: project.images.map((item) => item.imagePath === path ? { ...item, image: signedUrl } : item),
+      })),
+    } : current);
+    return signedUrl;
+  }, []);
 
   const handleOpenItem = (item: PortfolioItem) => {
     if (item.kind === 'project' && item.projectSlug) {
@@ -105,9 +147,65 @@ export default function PortfolioCatalogPage() {
     setSelectedImage(item);
   };
 
+  const handleImageError = useCallback(async (item: PortfolioItem, retry = false) => {
+    const path = item.imagePath;
+    if (!useSupabaseSource || !path) return;
+    const lastAttempt = imageRefreshAttempts.current.get(path) ?? 0;
+    if (!retry && Date.now() - lastAttempt < 60_000) {
+      setFailedImagePaths((current) => new Set(current).add(path));
+      return;
+    }
+    imageRefreshAttempts.current.set(path, Date.now());
+    try {
+      const signedUrl = await refreshImage(path);
+      setFailedImagePaths((current) => {
+        const next = new Set(current);
+        next.delete(path);
+        return next;
+      });
+      setSelectedImage((current) => current?.imagePath === path ? { ...current, image: signedUrl } : current);
+    } catch {
+      setFailedImagePaths((current) => new Set(current).add(path));
+    }
+  }, [refreshImage, useSupabaseSource]);
+
+  if (useSupabaseSource && isLoading) {
+    return (
+      <main id="main-content" tabIndex={-1} className="content-layer outline-none">
+        <section className="section-wrap pb-10">
+          <div className="container-xl">
+            <div className="flex min-h-[270px] items-end border-b border-[var(--brand-line)] pb-10 pt-20" role="status" aria-live="polite">
+              <div className="flex items-center gap-3 text-sm font-semibold text-[var(--brand-muted)]">
+                <span className="button-spinner h-4 w-4 animate-spin rounded-full border-2" />
+                კატალოგის მონაცემები და სურათები იტვირთება...
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (useSupabaseSource && errorMessage) {
+    return (
+      <main id="main-content" tabIndex={-1} className="content-layer outline-none">
+        <section className="section-wrap pb-10">
+          <div className="container-xl">
+            <div className="flex min-h-[270px] flex-col items-start justify-end gap-4 border-b border-[var(--brand-line)] pb-10 pt-20">
+              <span className="eyebrow"><span className="eyebrow-dot" />კატალოგი</span>
+              <h1 className="section-title">კატალოგის ჩატვირთვა ვერ მოხერხდა</h1>
+              <p className="section-subtitle max-w-3xl">{errorMessage}</p>
+              <button type="button" onClick={reload} className="button-secondary">ხელახლა ცდა</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   if (activeProject) {
     return (
-      <main className="content-layer">
+      <main id="main-content" tabIndex={-1} className="content-layer outline-none">
         <section className="section-wrap pb-10">
           <div className="container-xl">
             <motion.div
@@ -122,17 +220,17 @@ export default function PortfolioCatalogPage() {
                 className="button-secondary w-fit gap-2 text-xs"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Branding & Identity
+                {activeCategory.label}
               </button>
 
               <div className="flex max-w-4xl flex-col gap-5">
                 <span className="eyebrow">
                   <span className="eyebrow-dot" />
-                  Branding project
+                  ბრენდინგის პროექტი
                 </span>
                 <h1 className="section-title">{activeProject.title}</h1>
                 <p className="section-subtitle max-w-3xl">
-                  {activeProject.description || `${activeProject.images.length} image project`}
+                  {activeProject.description || `${activeProject.images.length} ნამუშევარი ერთ პროექტში`}
                 </p>
 
                 <div className="flex flex-wrap gap-2">
@@ -158,20 +256,29 @@ export default function PortfolioCatalogPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
               className="mx-auto w-full max-w-[1180px] overflow-hidden bg-white shadow-[var(--brand-shadow)]"
-              aria-label={`${activeProject.title} project`}
+              aria-label={`${activeProject.title} — პროექტის ნამუშევრები`}
             >
               {activeProject.images.map((item, index) => (
-                <img
-                  key={item.id}
-                  src={item.image}
-                  alt={`${activeProject.title} project image ${index + 1}`}
-                  className="block h-auto w-full"
-                  loading={index < 2 ? 'eager' : 'lazy'}
-                  decoding={index < 2 ? 'sync' : 'async'}
-                  onError={(event) => {
-                    event.currentTarget.hidden = true;
-                  }}
-                />
+                failedImagePaths.has(item.imagePath ?? '') ? (
+                  <div key={item.id} className="block w-full border-b border-[var(--brand-line)] px-6 py-16 text-center text-sm text-[var(--brand-muted)]" role="img" aria-label="სურათის ჩატვირთვა ვერ მოხერხდა">
+                    სურათის ჩატვირთვა ვერ მოხერხდა
+                    <button type="button" className="button-secondary ml-3" onClick={() => { imageRefreshAttempts.current.delete(item.imagePath ?? ''); void handleImageError(item, true); }}>ხელახლა ცდა</button>
+                  </div>
+                ) : (
+                  <img
+                    key={item.id}
+                    src={item.image}
+                    alt={`${activeProject.title} — ნამუშევარი ${index + 1}`}
+                    className="block h-auto w-full"
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    fetchPriority={index === 0 ? 'high' : 'auto'}
+                    onError={(event) => {
+                      if (useSupabaseSource) void handleImageError(item);
+                      else event.currentTarget.hidden = true;
+                    }}
+                  />
+                )
               ))}
             </motion.div>
           ) : (
@@ -188,7 +295,7 @@ export default function PortfolioCatalogPage() {
   }
 
   return (
-    <main className="content-layer">
+    <main id="main-content" tabIndex={-1} className="content-layer outline-none">
       <section className="section-wrap pb-10">
         <div className="container-xl">
           <motion.div
@@ -209,13 +316,13 @@ export default function PortfolioCatalogPage() {
             <div className="flex max-w-4xl flex-col gap-5">
               <span className="eyebrow">
                 <span className="eyebrow-dot" />
-                Photo catalog
+                ნამუშევრების კატალოგი
               </span>
               <h1 className="section-title">
                 {selectedCategory === 'all' ? 'ფოტოების კატალოგი' : activeCategory.label}
               </h1>
               <p className="section-subtitle max-w-3xl">
-                აირჩიეთ კატეგორია და ნახეთ შესაბამის folder-ში დამატებული ფოტოები და პროექტები.
+                {activeCategory.description}
               </p>
             </div>
           </motion.div>
@@ -226,7 +333,7 @@ export default function PortfolioCatalogPage() {
         <div className="container-xl">
           <div className="sticky top-[76px] z-30 -mx-5 mb-8 border-y border-[var(--brand-line)] bg-[var(--brand-header-surface)] px-5 py-4 backdrop-blur-xl sm:-mx-8 sm:px-8">
             <div className="container-xl flex gap-2 overflow-x-auto pb-1">
-              {categories.filter((category) => category.id !== 'all').map((category) => {
+              {categories.map((category) => {
                 const isActive = selectedCategory === category.id;
 
                 return (
@@ -234,6 +341,7 @@ export default function PortfolioCatalogPage() {
                     key={category.id}
                     type="button"
                     onClick={() => navigateToCategory(category.id, category.slug)}
+                    aria-pressed={isActive}
                     className={`shrink-0 rounded-full px-4 py-2 font-mono text-xs font-bold transition-all duration-200 ${
                       isActive
                         ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)] shadow-[var(--brand-accent-shadow-sm)]'
@@ -256,6 +364,7 @@ export default function PortfolioCatalogPage() {
                     key={item.id}
                     item={item}
                     onOpen={handleOpenItem}
+                    onImageError={useSupabaseSource ? handleImageError : undefined}
                     imageOnly
                   />
                 ))}
@@ -268,7 +377,7 @@ export default function PortfolioCatalogPage() {
               <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                 <ImageIcon className="h-5 w-5" />
               </span>
-              <p>ამ folder-ში ფოტო ან პროექტი ჯერ არ არის.</p>
+              <p>ამ კატეგორიაში ნამუშევარი ჯერ არ არის.</p>
             </div>
           )}
         </div>
@@ -279,6 +388,7 @@ export default function PortfolioCatalogPage() {
         items={modalItems}
         onClose={() => setSelectedImage(null)}
         onSelect={setSelectedImage}
+        onImageError={useSupabaseSource ? handleImageError : undefined}
         imageOnly
       />
     </main>

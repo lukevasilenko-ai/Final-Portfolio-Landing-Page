@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { Crop, Image, Layers3, Palette, PenTool, Type } from 'lucide-react';
 
 interface LoadingScreenProps {
@@ -21,6 +21,7 @@ const DESIGN_TOOLS = [
 ] as const;
 
 export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
+  const shouldReduceMotion = useReducedMotion();
   const [progress, setProgress] = useState(0);
   const activeTool = Math.min(
     DESIGN_TOOLS.length - 1,
@@ -28,7 +29,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
   );
 
   useEffect(() => {
-    const duration = 2200;
+    const duration = shouldReduceMotion ? 240 : 2200;
     const startedAt = performance.now();
     let frameId = 0;
     let completionTimer: number | undefined;
@@ -48,7 +49,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
         return;
       }
 
-      completionTimer = window.setTimeout(onComplete, 160);
+      completionTimer = window.setTimeout(onComplete, shouldReduceMotion ? 40 : 160);
     };
 
     frameId = requestAnimationFrame(tick);
@@ -58,7 +59,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
       if (completionTimer) window.clearTimeout(completionTimer);
       document.documentElement.style.overflow = previousOverflow;
     };
-  }, [onComplete]);
+  }, [onComplete, shouldReduceMotion]);
 
   return (
     <motion.div
@@ -68,14 +69,14 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
       aria-label={`იტვირთება ${progress}%`}
       initial={{ opacity: 1, clipPath: 'inset(0 0 0% 0)' }}
       exit={{ opacity: 0, clipPath: 'inset(0 0 100% 0)' }}
-      transition={{ duration: 0.72, ease: [0.76, 0, 0.24, 1] }}
+      transition={{ duration: shouldReduceMotion ? 0.12 : 0.72, ease: [0.76, 0, 0.24, 1] }}
     >
       <motion.div
         className="loading-panel"
         initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -20, scale: 1.015 }}
-        transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: shouldReduceMotion ? 0.12 : 0.48, ease: [0.16, 1, 0.3, 1] }}
       >
         <span className="loading-crop-mark loading-crop-mark-top-left" aria-hidden="true" />
         <span className="loading-crop-mark loading-crop-mark-top-right" aria-hidden="true" />
