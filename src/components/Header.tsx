@@ -20,7 +20,11 @@ const THEME_STORAGE_KEY = 'luka-imagines-theme';
 const getInitialTheme = (): ThemeMode => {
   if (typeof window === 'undefined') return 'light';
 
-  return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+
+  if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
 interface ThemeToggleProps {
@@ -30,7 +34,7 @@ interface ThemeToggleProps {
 
 function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
   const isDark = theme === 'dark';
-  const label = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+  const label = isDark ? 'ღია თემაზე გადასვლა' : 'მუქ თემაზე გადასვლა';
 
   return (
     <button
@@ -80,9 +84,28 @@ export default function Header({ activeSection }: HeaderProps) {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
+
+    handleScroll();
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileMenuOpen]);
 
   const navItems = [
     { label: 'მთავარი', href: '#home' },
@@ -133,7 +156,7 @@ export default function Header({ activeSection }: HeaderProps) {
             </div>
           </a>
 
-          <nav className="surface-card hidden items-center gap-1 rounded-full p-1 lg:flex">
+          <nav aria-label="მთავარი ნავიგაცია" className="surface-card hidden items-center gap-1 rounded-full p-1 lg:flex">
             {navItems.map((item) => {
               const isActive = activeSection === item.href.substring(1);
               return (
@@ -141,6 +164,7 @@ export default function Header({ activeSection }: HeaderProps) {
                   key={item.label}
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.href)}
+                  aria-current={isActive ? 'location' : undefined}
                   className={`relative rounded-full px-3 py-2 text-xs font-semibold transition-colors duration-200 xl:px-4 ${
                     isActive ? 'text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
                   }`}
@@ -186,7 +210,9 @@ export default function Header({ activeSection }: HeaderProps) {
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="icon-button"
-              aria-label="Toggle menu"
+              aria-label={isMobileMenuOpen ? 'მენიუს დახურვა' : 'მენიუს გახსნა'}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
             >
               {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
@@ -197,13 +223,14 @@ export default function Header({ activeSection }: HeaderProps) {
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
+            id="mobile-navigation"
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.2 }}
             className="surface-card fixed inset-x-4 top-[76px] z-40 flex flex-col gap-5 p-5 shadow-[var(--brand-shadow)] lg:hidden"
           >
-            <nav className="flex flex-col gap-2">
+            <nav aria-label="მობილური ნავიგაცია" className="flex flex-col gap-2">
               {navItems.map((item) => {
                 const isActive = activeSection === item.href.substring(1);
                 return (
@@ -211,6 +238,7 @@ export default function Header({ activeSection }: HeaderProps) {
                     key={item.label}
                     href={item.href}
                     onClick={(e) => handleNavClick(e, item.href)}
+                    aria-current={isActive ? 'location' : undefined}
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 ${
                       isActive ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:bg-white/60 hover:text-[var(--brand-ink)]'
                     }`}

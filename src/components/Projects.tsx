@@ -7,21 +7,17 @@ import { motion } from 'motion/react';
 import { ArrowRight, ArrowUpRight, FolderKanban } from 'lucide-react';
 import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
 import { getPortfolioCategoryCount } from '../data/catalogImages';
-
-const navigateTo = (path: string) => {
-  window.history.pushState(null, '', path);
-  window.dispatchEvent(new Event('app:navigate'));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+import { navigateWithinSite } from '../navigation';
+import FeaturedWorkShowcase from './FeaturedWorkShowcase';
 
 const getCategoryCountLabel = (categoryId: string) => {
   const count = getPortfolioCategoryCount(categoryId);
 
   if (categoryId === 'branding') {
-    return `${count} ${count === 1 ? 'project' : 'projects'}`;
+    return `${count} პროექტი`;
   }
 
-  return `${count} ${count === 1 ? 'photo' : 'photos'}`;
+  return `${count} ფოტო`;
 };
 
 export default function Projects() {
@@ -34,12 +30,15 @@ export default function Projects() {
               <span className="eyebrow-dot" />
               02 // portfolio
             </span>
-            <h2 className="section-title">ნამუშევრების კატალოგი category folder-ებით.</h2>
+            <h2 className="section-title">ნამუშევრები მიმართულებების მიხედვით.</h2>
+            <p className="section-subtitle max-w-2xl">
+              დაათვალიერეთ პოსტერები, ბრენდინგის პროექტები და საბეჭდი ნამუშევრები ერთ სივრცეში.
+            </p>
           </div>
 
           <button
             type="button"
-            onClick={() => navigateTo('/portfolio')}
+            onClick={() => navigateWithinSite('/portfolio')}
             className="button-secondary w-fit gap-2 text-xs"
           >
             სრული კატალოგი
@@ -47,7 +46,16 @@ export default function Projects() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <FeaturedWorkShowcase />
+
+        <div className="mb-4 mt-10 flex items-center justify-between gap-4">
+          <span className="font-mono text-[10px] font-bold uppercase text-[var(--brand-soft)]">
+            ყველა კატეგორია
+          </span>
+          <span className="h-px flex-1 bg-[var(--brand-line)]" aria-hidden="true" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {PORTFOLIO_CATEGORIES.map((category, index) => (
             <motion.button
               key={category.id}
@@ -56,7 +64,7 @@ export default function Projects() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-80px' }}
               transition={{ duration: 0.28, delay: index * 0.035 }}
-              onClick={() => navigateTo(`/portfolio/${category.slug}`)}
+              onClick={() => navigateWithinSite(`/portfolio/${category.slug}`)}
               className="surface-card group flex min-h-[150px] flex-col justify-between p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[var(--brand-line-strong)] hover:bg-white/90 hover:shadow-[var(--brand-shadow)]"
             >
               <div className="flex items-start justify-between gap-4">

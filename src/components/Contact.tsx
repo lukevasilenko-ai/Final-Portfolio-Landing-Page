@@ -3,79 +3,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import {
-  Send,
-  Mail,
-  Phone,
-  MessageSquare,
-  Check,
-  Sparkles,
-  ArrowUpRight
-} from 'lucide-react';
-import { ContactMessage } from '../types';
+import React, { useState } from 'react';
+import { ArrowUpRight, Clock, Mail, ShieldCheck } from 'lucide-react';
+import WhatsAppIcon from './WhatsAppIcon';
+
+const WHATSAPP_NUMBER = '995595213216';
 
 export default function Contact() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  const [messagesList, setMessagesList] = useState<ContactMessage[]>([]);
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  useEffect(() => {
-    const saved = localStorage.getItem('luke-portfolio-messages');
-    if (saved) {
-      try {
-        setMessagesList(JSON.parse(saved));
-      } catch (err) {
-        console.error("Failed to parse saved messages", err);
-      }
-    }
-  }, []);
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMessage = message.trim();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !message) return;
+    if (!trimmedName || !trimmedEmail || !trimmedMessage) return;
 
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      const newMessage: ContactMessage = {
-        id: 'msg-' + Date.now(),
-        name,
-        email,
-        subject: subject || 'ზოგადი თანამშრომლობა',
-        message,
-        timestamp: new Date().toLocaleString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      };
-
-      const updatedList = [newMessage, ...messagesList];
-      setMessagesList(updatedList);
-      localStorage.setItem('luke-portfolio-messages', JSON.stringify(updatedList));
-
-      setIsSubmitting(false);
-      setSubmitSuccess(true);
-
-      setName('');
-      setEmail('');
-      setSubject('');
-      setMessage('');
-
-      setTimeout(() => {
-        setSubmitSuccess(false);
-      }, 5000);
-
-    }, 1200);
+    const whatsappMessage = [
+      'გამარჯობა, მსურს დიზაინის პროექტზე საუბარი.',
+      '',
+      `სახელი: ${trimmedName}`,
+      `ელფოსტა: ${trimmedEmail}`,
+      `თემა: ${subject.trim() || 'ზოგადი დიზაინის პროექტი'}`,
+      '',
+      'პროექტის აღწერა:',
+      trimmedMessage
+    ].join('\n');
+    const chatUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
+    window.location.assign(chatUrl);
   };
 
   return (
@@ -84,11 +44,11 @@ export default function Contact() {
         <div className="mb-14 flex flex-col items-center gap-5 text-center">
           <span className="eyebrow">
             <span className="eyebrow-dot" />
-            06 // შემოსულები // თანამშრომლობა
+            06 // თანამშრომლობა
           </span>
           <h2 className="section-title">თანამშრომლობის დაწყება</h2>
-          <p className="section-subtitle max-w-xl">
-            გჭირდებათ არქიტექტორი რთული ვებ აპლიკაციის რეფაქტორირებისთვის ან კომპონენტების ძლიერი ვიზუალური ენის შესაქმნელად? გამოაგზავნეთ შეტყობინება ქვემოთ.
+          <p className="section-subtitle max-w-2xl">
+            გაქვთ ახალი ბრენდის, სოციალური მედიის ვიზუალის ან საბეჭდი მასალის იდეა? მოკლედ აღწერეთ პროექტი და საუბარს პირდაპირ WhatsApp-ში გავაგრძელებთ.
           </p>
         </div>
 
@@ -105,7 +65,7 @@ export default function Contact() {
                 <span className="text-[var(--brand-accent)]">განსაკუთრებული</span>.
               </h3>
               <p className="text-sm leading-8 text-[var(--brand-muted)]">
-                როგორც წესი, სწრაფად ვპასუხობ შემოთავაზებებს დიზაინ სისტემების ინტეგრაციასთან, წარმადობის ოპტიმიზაციის კონსულტაციებთან ან სრულყოფილი React პროექტების შექმნასთან დაკავშირებით.
+                ვიღებ ბრენდინგის, ლოგოს, სოციალური მედიის დიზაინისა და საბეჭდი მასალების პროექტებს. მომწერეთ იდეა, სასურველი ვადა და საჭირო ფორმატები.
               </p>
 
               <div className="h-px bg-[var(--brand-line)]" />
@@ -121,7 +81,7 @@ export default function Contact() {
                     <Mail className="h-4 w-4" />
                   </div>
                   <div className="flex min-w-0 flex-col leading-tight">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">ძირითადი ელფოსტა</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">ელფოსტა</span>
                     <span className="mt-1 flex items-center gap-1 break-all group-hover:underline">
                       lukevasilenko@gmail.com
                       <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -130,14 +90,16 @@ export default function Contact() {
                 </a>
 
                 <a
-                  href="tel:+995595213216"
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                  target="_blank"
+                  rel="noreferrer"
                   className="group flex items-center gap-3 text-sm font-semibold text-[var(--brand-ink)]"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
-                    <Phone className="h-4 w-4" />
+                    <WhatsAppIcon className="h-4 w-4" />
                   </div>
                   <div className="flex min-w-0 flex-col leading-tight">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">ტელეფონი</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">WhatsApp</span>
                     <span className="mt-1 flex items-center gap-1 group-hover:underline">
                       (+995) 595 21 32 16
                       <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -147,11 +109,11 @@ export default function Contact() {
 
                 <div className="flex items-center gap-3 text-sm text-[var(--brand-ink)]">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-copper-soft)] text-[var(--brand-copper)]">
-                    <MessageSquare className="h-4 w-4" />
+                    <Clock className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col leading-tight">
                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">სამუშაო საათები</span>
-                    <span className="mt-1 font-semibold">09:00 - 18:00 GMT</span>
+                    <span className="mt-1 font-semibold">09:00 - 18:00 GET</span>
                   </div>
                 </div>
               </div>
@@ -159,13 +121,13 @@ export default function Contact() {
 
             <div className="mt-8 border-t border-[var(--brand-line)] pt-6">
               <span className="block font-mono text-[10px] text-[var(--brand-muted)]">
-                ლუკ_ვასილენკო // დიზაინ_სისტემა_სტაბილური_V1
+                ლუკა ვასილენკო // დიზაინი, იდეა და ხასიათი
               </span>
             </div>
           </div>
 
           <div className="surface-card-strong relative p-6 sm:p-8 lg:col-span-8">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="flex h-full flex-col gap-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <label htmlFor="form-name" className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--brand-muted)]">თქვენი სახელი *</label>
@@ -173,8 +135,9 @@ export default function Contact() {
                     id="form-name"
                     type="text"
                     required
+                    autoComplete="name"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(event) => setName(event.target.value)}
                     placeholder="შეიყვანეთ თქვენი სახელი"
                     className="field-control"
                   />
@@ -186,8 +149,9 @@ export default function Contact() {
                     id="form-email"
                     type="email"
                     required
+                    autoComplete="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(event) => setEmail(event.target.value)}
                     placeholder="you@company.com"
                     className="field-control"
                   />
@@ -200,68 +164,43 @@ export default function Contact() {
                   id="form-subject"
                   type="text"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="მაგ: დიზაინ სისტემის პროექტი"
+                  onChange={(event) => setSubject(event.target.value)}
+                  placeholder="მაგ: ბრენდინგი ან სოციალური მედიის პაკეტი"
                   className="field-control"
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label htmlFor="form-message" className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--brand-muted)]">უსაფრთხო შეტყობინება *</label>
+              <div className="flex flex-1 flex-col gap-2">
+                <label htmlFor="form-message" className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--brand-muted)]">პროექტის აღწერა *</label>
                 <textarea
                   id="form-message"
                   required
-                  rows={5}
+                  rows={6}
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="აღწერეთ თქვენი მიზნები, მოთხოვნები, ვადები ან შეკითხვები..."
-                  className="field-control resize-none"
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="აღწერეთ მიზანი, საჭირო მასალები, ვადა და ნებისმიერი მნიშვნელოვანი დეტალი..."
+                  className="field-control min-h-40 flex-1 resize-y"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || !name || !email || !message}
-                className="button-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-start"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="button-spinner h-4 w-4 animate-spin rounded-full border-2" />
-                    უსაფრთხოდ იგზავნება...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    შეტყობინების გაგზავნა
-                  </>
-                )}
-              </button>
-            </form>
-
-            <AnimatePresence>
-              {submitSuccess && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute inset-x-6 bottom-6 flex items-start gap-3 rounded-lg border border-[var(--brand-success-line)] bg-[var(--brand-canvas-92)] p-4 text-[var(--brand-ink)] shadow-[var(--brand-shadow)] backdrop-blur-xl sm:inset-x-8 sm:bottom-8"
+              <div className="flex flex-col items-start gap-3 border-t border-[var(--brand-line)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p id="whatsapp-form-note" className="flex max-w-md items-start gap-2 text-xs leading-6 text-[var(--brand-muted)]">
+                  <ShieldCheck className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--brand-accent)]" />
+                  გაიხსნება WhatsApp და შეტყობინების გაგზავნას იქვე დაადასტურებთ.
+                </p>
+                <button
+                  type="submit"
+                  disabled={!name.trim() || !email.trim() || !message.trim()}
+                  aria-describedby="whatsapp-form-note"
+                  className="button-primary w-full shrink-0 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-success)] text-[var(--brand-on-accent)]">
-                    <Check className="h-5 w-5 stroke-[3px]" />
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="flex items-center gap-2 text-sm font-bold">
-                      შეტყობინება წარმატებით გაიგზავნა
-                      <Sparkles className="h-4 w-4 text-[var(--brand-copper)]" />
-                    </p>
-                    <p className="mt-1 text-xs leading-6 text-[var(--brand-muted)]">თქვენი შეტყობინება წარმატებით დამუშავდა. პასუხს მალე მიიღებთ.</p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <WhatsAppIcon className="h-4 w-4" />
+                  WhatsApp-ში გაგრძელება
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-
       </div>
     </section>
   );

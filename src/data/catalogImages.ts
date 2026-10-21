@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PORTFOLIO_CATEGORIES } from './portfolioItems';
+import { ALL_PORTFOLIO_CATEGORY, PORTFOLIO_CATEGORIES } from './portfolioItems';
 import {
   PortfolioCategory,
   PortfolioItem,
@@ -265,10 +265,7 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
 
 export const PORTFOLIO_FILTERS_WITH_COUNTS: PortfolioCategory[] = [
   {
-    id: 'all',
-    slug: 'all',
-    label: 'All',
-    description: 'All portfolio images and projects.',
+    ...ALL_PORTFOLIO_CATEGORY,
     count: PORTFOLIO_ITEMS.length
   },
   ...PORTFOLIO_CATEGORIES.map((category) => ({

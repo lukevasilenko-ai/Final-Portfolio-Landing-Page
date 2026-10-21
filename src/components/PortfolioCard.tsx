@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowUpRight, Star } from 'lucide-react';
+import { ArrowUpRight, ImageIcon, Star } from 'lucide-react';
 import { getPortfolioCategoryById } from '../data/portfolioItems';
 import { PortfolioItem } from '../types';
 
@@ -14,18 +14,22 @@ interface PortfolioCardProps {
   onOpen: (item: PortfolioItem) => void;
   compact?: boolean;
   imageOnly?: boolean;
+  onImageError?: (item: PortfolioItem, retry?: boolean) => void;
   key?: string;
 }
 
-export default function PortfolioCard({ item, onOpen, compact = false, imageOnly = false }: PortfolioCardProps) {
-  const category = getPortfolioCategoryById(item.category);
+export default function PortfolioCard({ item, onOpen, compact = false, imageOnly = false, onImageError }: PortfolioCardProps) {
+  const baseCategory = getPortfolioCategoryById(item.category);
+  const category = item.categoryLabel ? { ...baseCategory, label: item.categoryLabel } : baseCategory;
   const tags = item.tags ?? [];
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
   const [hasImageError, setHasImageError] = useState(false);
   const isProject = item.kind === 'project';
   const isWideImage = imageAspectRatio !== null && imageAspectRatio >= 1.6;
 
-  if (hasImageError) {
+  useEffect(() => setHasImageError(false), [item.image]);
+
+  if (hasImageError && !onImageError) {
     return null;
   }
 
@@ -56,28 +60,35 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
             className="relative w-full overflow-hidden bg-[var(--brand-page-soft)] transition-colors duration-300 group-hover:bg-white"
             style={{ aspectRatio: imageAspectRatio ?? (isProject ? 16 / 9 : 1) }}
           >
-            <img
-              src={item.image}
-              alt={item.title}
-              className="absolute left-1/2 top-1/2 h-[95.238%] w-[95.238%] -translate-x-1/2 -translate-y-1/2 object-contain transition-transform duration-500 ease-out group-hover:scale-[1.018]"
-              loading="lazy"
-              decoding="async"
-              onError={() => setHasImageError(true)}
-              onLoad={(event) => {
-                const image = event.currentTarget;
+            {hasImageError && onImageError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center text-xs text-[var(--brand-muted)]">
+                <ImageIcon className="h-5 w-5 text-[var(--brand-accent)]" />
+                <span>სურათის ჩატვირთვა ვერ მოხერხდა</span>
+              </div>
+            ) : (
+              <img
+                src={item.image}
+                alt={item.title}
+                className="absolute left-1/2 top-1/2 h-[95.238%] w-[95.238%] -translate-x-1/2 -translate-y-1/2 object-contain transition-transform duration-500 ease-out group-hover:scale-[1.018]"
+                loading="lazy"
+                decoding="async"
+                onError={() => { setHasImageError(true); onImageError?.(item); }}
+                onLoad={(event) => {
+                  const image = event.currentTarget;
 
-                if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-                  setImageAspectRatio(image.naturalWidth / image.naturalHeight);
-                }
-              }}
-            />
+                  if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+                    setImageAspectRatio(image.naturalWidth / image.naturalHeight);
+                  }
+                }}
+              />
+            )}
           </div>
 
           {isProject && (
             <div className="flex min-h-[92px] items-center justify-between gap-4 border-t border-[var(--brand-line)] px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <p className="font-mono text-[10px] font-bold uppercase text-[var(--brand-soft)]">
-                  Branding & Identity
+                  {category.label}
                 </p>
                 <h2 className="mt-1 truncate text-lg font-extrabold text-[var(--brand-ink)]">
                   {item.title}

@@ -22,7 +22,8 @@ export default function Hero() {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false
+      hour12: false,
+      timeZone: 'Asia/Tbilisi'
     });
   };
 
@@ -35,8 +36,8 @@ export default function Hero() {
   };
 
   return (
-    <section id="home" className="section-wrap flex min-h-[88vh] items-center pt-28 sm:pt-32">
-      <div className="container-xl grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-x-16 lg:gap-y-8">
+    <section id="home" className="section-wrap flex min-h-[88vh] items-center pb-8 pt-28 md:pb-24 md:pt-32">
+      <div className="container-xl grid grid-cols-1 items-center gap-8 md:gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-x-16 lg:gap-y-8">
         <div className="flex flex-col items-start gap-6">
           <motion.div
             initial={{ opacity: 0, x: -14 }}
@@ -109,7 +110,7 @@ export default function Hero() {
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
-          className="relative lg:row-span-2"
+          className="relative mx-auto w-full max-w-[260px] md:max-w-none lg:row-span-2"
         >
           <div className="surface-card-strong overflow-hidden p-2">
             <div className="relative aspect-square overflow-hidden rounded-lg">
@@ -117,6 +118,11 @@ export default function Hero() {
                 src={HERO_ARTWORK}
                 alt="ავეჯის სარეკლამო პოსტერი"
                 className="h-full w-full object-cover"
+                width={2000}
+                height={2000}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
               />
               <div className="absolute bottom-3 right-3 rounded-lg border border-[var(--brand-line)] bg-white/70 px-4 py-2 text-sm font-bold text-[var(--brand-ink)] shadow-[var(--brand-shadow-soft)] backdrop-blur-md">
                 ბოლო ნამუშევარი
@@ -130,7 +136,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 0.32 }}
-          className="lead-copy lg:col-start-1 lg:row-start-2"
+          className="lead-copy hidden md:block lg:col-start-1 lg:row-start-2"
         >
           გამარჯობა, მე ვარ ლუკა ვასილენკო. მე ვქმნი თვალშისაცემ ვიზუალურ პროდუქტებს, სადაც კრეატიული იდეები და ვიზუალური მინიმალიზმი ერთმანეთს ერწყმის. სპეციალიზებული ვარ სოც. მედია პოსტერების, ლოგოების, ბანერების, სავიზიტო ბარათების, ბრენდინგისა და რებრენდინგის მიმართულებით. ვმუშაობ Adobe Photoshop-სა და Adobe Illustrator-ში.
         </motion.p>
@@ -139,7 +145,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 0.4 }}
-          className="surface-card grid w-full grid-cols-1 gap-4 p-4 sm:grid-cols-3 sm:p-5 lg:col-span-2"
+          className="surface-card hidden w-full grid-cols-3 gap-4 p-5 md:grid lg:col-span-2"
         >
           <div className="flex items-start gap-3">
             <MapPin className="mt-0.5 h-4 w-4 text-[var(--brand-accent)]" />
@@ -155,7 +161,7 @@ export default function Hero() {
               <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--brand-soft)]">ადგილობრივი დრო</p>
               <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--brand-ink)]">
                 <span>{formatTime(time)}</span>
-                <span className="font-mono text-[10px] font-normal text-[var(--brand-muted)]">BST</span>
+                <span className="font-mono text-[10px] font-normal text-[var(--brand-muted)]">GET</span>
               </p>
             </div>
           </div>

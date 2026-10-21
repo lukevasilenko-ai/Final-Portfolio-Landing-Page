@@ -21,11 +21,7 @@ export interface Project {
   features: string[];
 }
 
-export type PortfolioCategoryId =
-  | 'all'
-  | 'product-posters'
-  | 'branding'
-  | 'billboards-print';
+export type PortfolioCategoryId = string;
 
 export type PortfolioItemCategory = Exclude<PortfolioCategoryId, 'all'>;
 
@@ -48,6 +44,8 @@ export interface PortfolioItem {
   serviceType?: string;
   industry?: string;
   image: string;
+  imagePath?: string;
+  categoryLabel?: string;
   description?: string;
   tags?: string[];
   featured?: boolean;
@@ -65,7 +63,9 @@ export interface PortfolioProject {
   title: string;
   description: string;
   category: PortfolioItemCategory;
+  categoryLabel?: string;
   cover: string;
+  coverPath?: string;
   tags: string[];
   tools: string[];
   year?: string;
