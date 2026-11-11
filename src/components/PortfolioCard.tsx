@@ -18,13 +18,23 @@ interface PortfolioCardProps {
   key?: string;
 }
 
+// Rendered image widths in the catalog grid (PortfolioCatalogPage: 2/3/4 columns,
+// 1680px max container, image at ~95% of the tile). `auto` lets browsers that support
+// it use the laid-out width of these lazy-loaded images instead.
+const TILE_IMAGE_SIZES = 'auto, (min-width: 1744px) 392px, (min-width: 1024px) 24vw, (min-width: 640px) 32vw, 48vw';
+const WIDE_TILE_IMAGE_SIZES = 'auto, (min-width: 1744px) 794px, (min-width: 1024px) 48vw, (min-width: 640px) 64vw, 92vw';
+const CARD_IMAGE_SIZES = '(min-width: 1024px) 34vw, (min-width: 640px) 50vw, 100vw';
+
 export default function PortfolioCard({ item, onOpen, compact = false, imageOnly = false, onImageError }: PortfolioCardProps) {
   const baseCategory = getPortfolioCategoryById(item.category);
   const category = item.categoryLabel ? { ...baseCategory, label: item.categoryLabel } : baseCategory;
   const tags = item.tags ?? [];
-  const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+  const thumbnail = item.thumbnail;
+  const [loadedAspectRatio, setLoadedAspectRatio] = useState<number | null>(null);
   const [hasImageError, setHasImageError] = useState(false);
   const isProject = item.kind === 'project';
+  // Known up front for generated thumbnails, so wide tiles take their final size before loading.
+  const imageAspectRatio = loadedAspectRatio ?? (thumbnail ? thumbnail.width / thumbnail.height : null);
   const isWideImage = imageAspectRatio !== null && imageAspectRatio >= 1.6;
 
   useEffect(() => setHasImageError(false), [item.image]);
@@ -67,7 +77,9 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
               </div>
             ) : (
               <img
-                src={item.image}
+                src={thumbnail?.src ?? item.image}
+                srcSet={thumbnail?.srcSet}
+                sizes={thumbnail ? (isProject || isWideImage ? WIDE_TILE_IMAGE_SIZES : TILE_IMAGE_SIZES) : undefined}
                 alt={item.title}
                 className="absolute left-1/2 top-1/2 h-[95.238%] w-[95.238%] -translate-x-1/2 -translate-y-1/2 object-contain transition-transform duration-500 ease-out group-hover:scale-[1.018]"
                 loading="lazy"
@@ -77,7 +89,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
                   const image = event.currentTarget;
 
                   if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-                    setImageAspectRatio(image.naturalWidth / image.naturalHeight);
+                    setLoadedAspectRatio(image.naturalWidth / image.naturalHeight);
                   }
                 }}
               />
@@ -121,7 +133,9 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
       >
         <div className={`relative overflow-hidden border-b border-[var(--brand-line)] ${compact ? 'aspect-[4/3]' : 'aspect-[16/11]'}`}>
           <img
-            src={item.image}
+            src={thumbnail?.src ?? item.image}
+            srcSet={thumbnail?.srcSet}
+            sizes={thumbnail ? CARD_IMAGE_SIZES : undefined}
             alt={item.title}
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]"
             onError={() => setHasImageError(true)}

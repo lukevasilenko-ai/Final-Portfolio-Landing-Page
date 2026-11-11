@@ -40,6 +40,20 @@ const featuredEntries = PORTFOLIO_CATEGORIES.reduce<FeaturedEntry[]>((entries, c
   return entries;
 }, []);
 
+// The stage's image box, from the classes below: 396px tall from lg (620px stage minus
+// pt-24/pb-32), 336px from sm, 238px on phones; its width is the stage minus px-12/px-6.
+// The image is object-contain, so it usually fills the height and its width follows
+// from the aspect ratio.
+const getStageImageSizes = (aspectRatio: number) => {
+  const heightLimitedWidth = (boxHeight: number) => `${Math.round(boxHeight * aspectRatio)}px`;
+
+  return [
+    `(min-width: 1024px) min(${heightLimitedWidth(396)}, calc(75vw - 140px), 1158px)`,
+    `(min-width: 640px) min(${heightLimitedWidth(336)}, calc(100vw - 152px))`,
+    `min(${heightLimitedWidth(238)}, calc(100vw - 86px))`
+  ].join(', ');
+};
+
 const getCountLabel = (entry: FeaturedEntry) =>
   entry.category.id === 'branding'
     ? `${entry.count} პროექტი`
@@ -51,6 +65,8 @@ export default function FeaturedWorkShowcase() {
   const activeEntry = featuredEntries[activeIndex];
 
   if (!activeEntry) return null;
+
+  const activeThumbnail = activeEntry.item.thumbnail;
 
   const showEntry = (index: number) => {
     const normalizedIndex = (index + featuredEntries.length) % featuredEntries.length;
@@ -209,7 +225,9 @@ export default function FeaturedWorkShowcase() {
             >
               <div className="featured-work-artwork flex h-full w-full items-center justify-center">
                 <img
-                  src={activeEntry.item.image}
+                  src={activeThumbnail?.src ?? activeEntry.item.image}
+                  srcSet={activeThumbnail?.srcSet}
+                  sizes={activeThumbnail ? getStageImageSizes(activeThumbnail.width / activeThumbnail.height) : undefined}
                   alt={activeEntry.item.title}
                   className="max-h-full max-w-full object-contain"
                   loading="lazy"

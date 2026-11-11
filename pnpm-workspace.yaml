@@ -1,3 +1,6 @@
 allowBuilds:
   esbuild: true
   protobufjs: true
+  # sharp loads its prebuilt @img/sharp-* binaries; its install script only
+  # checks for them or falls back to compiling libvips from source.
+  sharp: false

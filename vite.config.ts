@@ -1,11 +1,44 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, type Plugin} from 'vite';
+import {generateCatalogVariants} from './scripts/generate-catalog-variants.mjs';
+
+/**
+ * Generates the resized catalog images that grid tiles load (see
+ * scripts/generate-catalog-variants.mjs) before any module is transformed, so the
+ * glob in src/data/catalogImages.ts sees them. A build fails if this fails; the dev
+ * server only warns, and tiles fall back to the original images.
+ */
+function catalogImageVariants(): Plugin {
+  let run: Promise<void> | undefined;
+  let isBuild = false;
+
+  return {
+    name: 'catalog-image-variants',
+    configResolved(config) {
+      isBuild = config.command === 'build';
+    },
+    buildStart() {
+      run ??= generateCatalogVariants().then(
+        ({generated, reused, removed}) => {
+          if (generated || removed) {
+            console.info(`[catalog-image-variants] ${generated} generated, ${reused} unchanged, ${removed} stale removed`);
+          }
+        },
+        (error: unknown) => {
+          if (isBuild) throw error;
+          console.warn('[catalog-image-variants] Could not generate resized catalog images; tiles will load the originals.', error);
+        },
+      );
+      return run;
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [catalogImageVariants(), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

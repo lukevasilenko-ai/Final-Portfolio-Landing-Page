@@ -8,11 +8,23 @@ import {
   PortfolioCategory,
   PortfolioItem,
   PortfolioItemCategory,
-  PortfolioProject
+  PortfolioProject,
+  ResponsiveImage
 } from '../types';
 
 const catalogImageModules = import.meta.glob(
   '../assets/catalog/**/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}',
+  {
+    eager: true,
+    import: 'default',
+    query: '?url'
+  }
+) as Record<string, string>;
+
+// Resized copies of the tile images, written by scripts/generate-catalog-variants.mjs
+// as `<original path>.<width>x<height>.webp`. The originals above stay untouched.
+const catalogImageVariantModules = import.meta.glob(
+  '../assets/catalog-variants/**/*.webp',
   {
     eager: true,
     import: 'default',
@@ -40,12 +52,20 @@ const categoryByFolder = new Map(
 interface CatalogFile {
   category: PortfolioItemCategory;
   filename: string;
+  path: string;
   url: string;
 }
 
 interface ProjectAssetFile {
   filename: string;
+  path: string;
   url: string;
+}
+
+interface ImageVariant {
+  url: string;
+  width: number;
+  height: number;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -75,6 +95,42 @@ const compareFilenames = (first: string, second: string) => {
   }
 
   return numericCollator.compare(first, second);
+};
+
+const variantsBySourcePath = new Map<string, ImageVariant[]>();
+
+for (const [path, url] of Object.entries(catalogImageVariantModules)) {
+  const match = path.match(/^\.\.\/assets\/catalog-variants\/(.+)\.(\d+)x(\d+)\.webp$/);
+
+  if (!match || typeof url !== 'string') {
+    continue;
+  }
+
+  const [, source, width, height] = match;
+  const sourcePath = `../assets/catalog/${source}`;
+  const variants = variantsBySourcePath.get(sourcePath) ?? [];
+  variants.push({ url, width: Number(width), height: Number(height) });
+  variantsBySourcePath.set(sourcePath, variants);
+}
+
+// Whitespace ends a srcset URL, and catalog filenames contain spaces. Commas inside a URL
+// are fine (tiny variants are inlined as `data:image/webp;base64,...` URLs).
+const toSrcSetUrl = (url: string) => url.replace(/\s/g, (character) => encodeURIComponent(character));
+
+const getThumbnail = (sourcePath: string): ResponsiveImage | undefined => {
+  const variants = [...(variantsBySourcePath.get(sourcePath) ?? [])].sort((first, second) => first.width - second.width);
+  const largest = variants.at(-1);
+
+  if (!largest) {
+    return undefined;
+  }
+
+  return {
+    src: (variants.find((variant) => variant.width >= 640) ?? largest).url,
+    srcSet: variants.map((variant) => `${toSrcSetUrl(variant.url)} ${variant.width}w`).join(', '),
+    width: largest.width,
+    height: largest.height
+  };
 };
 
 const compareCatalogFiles = (first: CatalogFile, second: CatalogFile) =>
@@ -118,6 +174,7 @@ const directCatalogFiles = Object.entries(catalogImageModules)
     return {
       category: category.id as PortfolioItemCategory,
       filename,
+      path,
       url
     };
   })
@@ -144,6 +201,7 @@ const directPortfolioItems: PortfolioItem[] = directCatalogFiles.map((file) => {
     serviceType: category.label,
     industry: category.label,
     image: file.url,
+    thumbnail: getThumbnail(file.path),
     description: '',
     tags: [],
     featured: false,
@@ -163,7 +221,7 @@ for (const [path, url] of Object.entries(catalogImageModules)) {
 
   const [, folder, filename] = match;
   const files = projectAssetsByFolder.get(folder) ?? [];
-  files.push({ filename, url });
+  files.push({ filename, path, url });
   projectAssetsByFolder.set(folder, files);
 }
 
@@ -219,6 +277,7 @@ export const PORTFOLIO_PROJECTS: PortfolioProject[] = Object.entries(catalogProj
       description,
       category,
       cover: cover.url,
+      coverThumbnail: getThumbnail(cover.path),
       tags,
       tools,
       year: publishedDate?.slice(0, 4),
@@ -240,6 +299,7 @@ const projectPortfolioItems: PortfolioItem[] = PORTFOLIO_PROJECTS.map((project) 
   serviceType: 'Branding & Identity',
   industry: 'Brand Identity',
   image: project.cover,
+  thumbnail: project.coverThumbnail,
   description: project.description,
   tags: project.tags,
   year: project.year,

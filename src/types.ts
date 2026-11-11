@@ -36,6 +36,17 @@ export interface PortfolioCategory {
   count?: number;
 }
 
+/** Resized copies of an image for display at tile size; see scripts/generate-catalog-variants.mjs. */
+export interface ResponsiveImage {
+  /** A mid-size variant, used where `srcSet` is not supported. */
+  src: string;
+  /** Every variant with its width descriptor, smallest first. */
+  srcSet: string;
+  /** Dimensions of the largest variant; they give the image's aspect ratio before it loads. */
+  width: number;
+  height: number;
+}
+
 export interface PortfolioItem {
   id: string;
   title: string;
@@ -43,7 +54,10 @@ export interface PortfolioItem {
   kind?: PortfolioItemKind;
   serviceType?: string;
   industry?: string;
+  /** The original, full-size image (lightbox and project pages). */
   image: string;
+  /** Smaller variants for tiles; absent when none were generated (e.g. Supabase images). */
+  thumbnail?: ResponsiveImage;
   imagePath?: string;
   categoryLabel?: string;
   description?: string;
@@ -65,6 +79,7 @@ export interface PortfolioProject {
   category: PortfolioItemCategory;
   categoryLabel?: string;
   cover: string;
+  coverThumbnail?: ResponsiveImage;
   coverPath?: string;
   tags: string[];
   tools: string[];
