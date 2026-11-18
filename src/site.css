@@ -387,18 +387,20 @@ html[data-surface="site"] body {
   }
 
   /*
-   * Strip of square posters on a slight diagonal: grey and quiet while it drifts. The row
-   * settles to a stop under the pointer (WorkStrip.tsx). The poster you point at lifts out of
-   * the slope in its real colours and leans in 3D after the pointer like a card in the hand,
-   * with a soft light following the pointer and a glow of its own colours behind it.
+   * Strip of posters on a slight diagonal: grey and quiet while it drifts. The row settles to a
+   * stop under the pointer (WorkStrip.tsx). The poster you point at springs out of the slope in
+   * its real colours, turned a little to one side or the other (a fresh random angle every time,
+   * set by WorkStrip), leans in 3D after the pointer like a card in the hand, and a streak of light
+   * runs across it. Its neighbours lean away to make room; a glow of its own colours rises behind.
    */
   .work-strip {
-    --strip-gap: clamp(10px, 1.2vw, 18px);
-    --strip-tile: clamp(148px, 13.5vw, 212px);
+    --strip-gap: clamp(12px, 1.3vw, 20px);
+    --strip-tile: clamp(164px, 15vw, 244px);
     --strip-tilt: -3deg;
-    --strip-room-top: 40px;
-    --strip-room-bottom: 48px;
+    --strip-room-top: 58px;
+    --strip-room-bottom: 60px;
     --strip-spring: cubic-bezier(0.2, 1.35, 0.4, 1);
+    --strip-pop: cubic-bezier(0.3, 1.6, 0.5, 1);
     --strip-grey: grayscale(0.9) brightness(0.88) contrast(0.96);
     --strip-grey-opacity: 0.86;
     position: relative;
@@ -444,7 +446,14 @@ html[data-surface="site"] body {
     height: var(--strip-tile);
     border-radius: var(--radius-card);
     background: var(--brand-page-soft);
-    transition: transform 720ms var(--strip-spring), box-shadow 720ms var(--motion-ease), width 500ms var(--motion-ease);
+    /* Settling back (and making room for a neighbour) is a slower, softer spring. */
+    transition:
+      translate 640ms var(--strip-spring),
+      rotate 640ms var(--strip-spring),
+      scale 640ms var(--strip-spring),
+      transform 640ms var(--motion-ease),
+      box-shadow 640ms var(--motion-ease),
+      width 500ms var(--motion-ease);
   }
 
   /* While the live list loads: quiet empty tiles that breathe a little. */
@@ -465,29 +474,55 @@ html[data-surface="site"] body {
     transition: filter 650ms ease, opacity 650ms ease;
   }
 
-  .work-strip-item:hover,
-  .work-strip-item:focus-visible {
+  /* The quick, springy rise; the 3D lean follows the pointer smoothly on top of it. (Doubled
+     class: stronger than the neighbour rules below, whatever the order of matching.) */
+  .work-strip-item.work-strip-item:hover,
+  .work-strip-item.work-strip-item:focus-visible {
     z-index: 2;
-    transform: translateY(-18px) rotate(calc(-1 * var(--strip-tilt))) scale(1.08)
-      perspective(700px) rotateX(calc(var(--my, 0) * -18deg)) rotateY(calc(var(--mx, 0) * 18deg));
-    box-shadow: 0 28px 44px -22px rgb(0 0 0 / 0.65);
-    transition: transform 320ms ease-out, box-shadow 720ms var(--motion-ease);
+    translate: 0 var(--lift-y, -22px);
+    rotate: calc(-1 * var(--strip-tilt) + var(--lift-rot, 0deg));
+    scale: 1.1;
+    transform: perspective(700px) rotateX(calc(var(--my, 0) * -16deg)) rotateY(calc(var(--mx, 0) * 16deg));
+    box-shadow: 0 30px 48px -22px rgb(0 0 0 / 0.65);
+    transition:
+      translate 300ms var(--strip-pop),
+      rotate 300ms var(--strip-pop),
+      scale 300ms var(--strip-pop),
+      transform 220ms ease-out,
+      box-shadow 380ms var(--motion-ease);
   }
 
   .work-strip-item:hover img,
   .work-strip-item:focus-visible img {
     filter: none;
     opacity: 1;
+    transition: filter 260ms ease, opacity 260ms ease;
   }
 
-  /* Soft light that follows the pointer across the poster. */
+  /* The neighbours lean away to make room (never the poster that is itself under the pointer). */
+  .work-strip-item:hover + .work-strip-item:not(:hover) {
+    translate: 12px 4px;
+    rotate: 2.5deg;
+  }
+  .work-strip-item:not(:hover):has(+ .work-strip-item:hover) {
+    translate: -12px 4px;
+    rotate: -2.5deg;
+  }
+
+  /* Light on the poster: a soft spot that follows the pointer, and a streak that sweeps across
+     once as it rises (two layers of one overlay). */
   .work-strip-item::before {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 1;
     border-radius: inherit;
-    background: radial-gradient(circle at calc((var(--mx, 0) + 0.5) * 100%) calc((var(--my, 0) + 0.5) * 100%), rgb(255 255 255 / 0.55), transparent 58%);
+    background:
+      radial-gradient(circle at calc((var(--mx, 0) + 0.5) * 100%) calc((var(--my, 0) + 0.5) * 100%), rgb(255 255 255 / 0.55), transparent 58%),
+      linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.6) 50%, transparent 60%);
+    background-repeat: no-repeat;
+    background-size: 100% 100%, 280% 100%;
+    background-position: 0 0, 120% 0;
     mix-blend-mode: soft-light;
     opacity: 0;
     transition: opacity 400ms ease;
@@ -496,6 +531,11 @@ html[data-surface="site"] body {
 
   .work-strip-item:hover::before {
     opacity: 1;
+    animation: work-strip-shine 900ms cubic-bezier(0.35, 0.4, 0.2, 1) 60ms both;
+  }
+  @keyframes work-strip-shine {
+    from { background-position: 0 0, 120% 0; }
+    to { background-position: 0 0, -20% 0; }
   }
 
   /* Glow of the poster's own colours, rising behind it. */
@@ -515,7 +555,8 @@ html[data-surface="site"] body {
   .work-strip-item:hover::after,
   .work-strip-item:focus-visible::after {
     opacity: 0.85;
-    transform: translateY(20px) scale(1.08);
+    transform: translateY(22px) scale(1.1);
+    transition: opacity 320ms ease, transform 500ms var(--motion-ease);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -523,10 +564,19 @@ html[data-surface="site"] body {
       overflow-x: auto;
     }
 
-    /* No leaning after the pointer: the poster just rises, straight, in colour. */
-    .work-strip-item:hover,
-    .work-strip-item:focus-visible {
-      transform: translateY(-18px) rotate(calc(-1 * var(--strip-tilt))) scale(1.08);
+    /* No turning or leaning: the poster just rises, straight, in colour; neighbours stay put. */
+    .work-strip-item.work-strip-item:hover,
+    .work-strip-item.work-strip-item:focus-visible {
+      rotate: calc(-1 * var(--strip-tilt));
+      transform: none;
+    }
+    .work-strip-item:hover + .work-strip-item:not(:hover),
+    .work-strip-item:not(:hover):has(+ .work-strip-item:hover) {
+      translate: none;
+      rotate: none;
+    }
+    .work-strip-item:hover::before {
+      animation: none;
     }
 
     .work-strip-item,

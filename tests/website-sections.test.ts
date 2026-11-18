@@ -171,7 +171,10 @@ test('the Selected Work showcase is removed from the portfolio section and the b
   const projectsSource = readFileSync(new URL('../src/components/Projects.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(projectsSource, /FeaturedWorkShowcase/);
   assert.doesNotMatch(projectsSource, /NativeElementSlot id="projects\.featured-work"/);
-  assert.match(projectsSource, /slot: 'projects\.title'/);
+  // The section heading (title, text, catalogue button) was later taken off the page on request;
+  // the category list opens the section.
+  assert.doesNotMatch(projectsSource, /slot: 'projects\.title'/);
+  assert.match(projectsSource, /NativeElementSlot id="projects\.category-cards"/);
   assert.equal(NATIVE_ELEMENT_SLOT_IDS.includes('projects.eyebrow'), false);
   assert.equal(NATIVE_ELEMENT_SLOT_IDS.includes('projects.featured-work'), false);
 });

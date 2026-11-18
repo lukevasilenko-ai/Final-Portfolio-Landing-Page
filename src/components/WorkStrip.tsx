@@ -67,10 +67,24 @@ function followPointer(event: ReactPointerEvent<HTMLElement>) {
 }
 
 /**
- * A slow, grey, endlessly drifting row of square posters, tilted slightly on a diagonal. It
- * settles to a stop under the pointer (or keyboard focus), where the poster you point at lifts
- * out of the slope in its real colours, leans in 3D after the pointer with a soft light on it
- * and a glow of its own colours behind it (site.css). It eases back when the pointer leaves,
+ * A fresh angle and height for a poster about to rise: turned 2.5–6.5° to one side or the
+ * other at random, so no two lifts look alike.
+ */
+const stripItemOf = (target: EventTarget | null) =>
+  target instanceof HTMLElement ? target.closest('.work-strip-item') as HTMLElement | null : null;
+
+function pickLift(item: HTMLElement) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  item.style.setProperty('--lift-rot', `${(side * (2.5 + Math.random() * 4)).toFixed(2)}deg`);
+  item.style.setProperty('--lift-y', `${(-(18 + Math.random() * 8)).toFixed(1)}px`);
+}
+
+/**
+ * A slow, grey, endlessly drifting row of posters, tilted slightly on a diagonal. It settles to
+ * a stop under the pointer (or keyboard focus), where the poster you point at springs out of
+ * the slope in its real colours, turned a little to a random side (pickLift), leans in 3D after
+ * the pointer, a streak of light sweeps across it, its neighbours lean away and a glow of its
+ * own colours rises behind it (site.css). It eases back when the pointer leaves,
  * pauses while off screen, and stays still for reduced-motion users. `lead(copy)` renders
  * first (the editable hero artwork); the set is drawn twice for a seamless loop. By default it
  * shows the posters category as it is in the admin (new uploads appear on their own); a fixed
@@ -80,6 +94,7 @@ export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNod
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const holdRef = useRef(false);
+  const liftedRef = useRef<HTMLElement | null>(null);
   // Each poster keeps its own shape (width ÷ height, read once it loads); all are the same height.
   const [ratios, setRatios] = useState<ReadonlyMap<string, number>>(() => new Map());
   const [works, setWorks] = useState<Map<string, StripWork>>(() => new Map());
@@ -246,10 +261,19 @@ export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNod
       ref={viewportRef}
       className="work-strip"
       onPointerEnter={() => { holdRef.current = true; }}
-      onPointerLeave={() => { holdRef.current = false; }}
-      onPointerOver={followPointer}
+      onPointerLeave={() => { holdRef.current = false; liftedRef.current = null; }}
+      onPointerOver={(event) => {
+        // Entering a new poster: give it its own random turn before it rises.
+        const item = stripItemOf(event.target);
+        if (item && item !== liftedRef.current) { liftedRef.current = item; pickLift(item); }
+        followPointer(event);
+      }}
+      onFocus={(event) => {
+        const item = stripItemOf(event.target);
+        if (item) pickLift(item);
+        holdRef.current = true;
+      }}
       onPointerMove={followPointer}
-      onFocus={() => { holdRef.current = true; }}
       onBlur={() => { holdRef.current = false; }}
     >
       <div ref={trackRef} className="work-strip-track">
