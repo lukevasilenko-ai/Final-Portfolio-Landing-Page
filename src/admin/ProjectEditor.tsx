@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getCategoryAdminLabel } from './labels';
+import { adminConfirm } from './feedback';
 
 export type ProjectEditorCategory = {
   id: string;
@@ -143,6 +144,16 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
   }, []);
 
   useEffect(() => {
+    if (!hasUnsavedChanges || isSaving) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasUnsavedChanges, isSaving]);
+
+  useEffect(() => {
     if (!project || !supabase) return;
     let active = true;
     setGalleryLoading(true);
@@ -205,15 +216,22 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSaving) requestClose();
+      // A confirmation dialog on top handles its own Escape.
+      if (event.key === 'Escape' && !isSaving && !document.querySelector('.admin-dialog')) void requestClose();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   });
 
-  function requestClose() {
+  async function requestClose() {
     if (isSaving) return;
-    if (hasUnsavedChanges && !window.confirm('დახურვის შემთხვევაში შენახული ცვლილებები დაიკარგება. გსურთ დახურვა?')) return;
+    if (hasUnsavedChanges && !await adminConfirm({
+      title: 'შეუნახავი ცვლილებები',
+      message: 'დახურვის შემთხვევაში შეუნახავი ცვლილებები დაიკარგება.',
+      confirmLabel: 'დახურვა',
+      cancelLabel: 'რედაქტირების გაგრძელება',
+      tone: 'danger',
+    })) return;
     onClose();
   }
 
@@ -315,24 +333,30 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
       return;
     }
     if (isPublished && !newCover && !coverPath) {
-      setErrorMessage('გამოქვეყნებამდე პროექტს ქავერის სურათი უნდა ჰქონდეს.');
+      setErrorMessage('საიტზე გამოსაჩენად პროექტს მთავარი სურათი უნდა ჰქონდეს.');
       return;
     }
     if (presentationType === 'image' && gallery.length > 0) {
-      setErrorMessage('ინდივიდუალურ სურათს გალერეა არ უნდა ჰქონდეს. არსებული გალერეის წაშლა ამ ეტაპზე გამორთულია.');
+      setErrorMessage('ამ პროექტს დამატებითი სურათები აქვს — „დამატებით სურათებში“ აირჩიეთ „სურათების გალერეა“.');
       return;
     }
-    if (!project && isPublished && !window.confirm('პროექტი გამოქვეყნდება და საჯაროდ გამოჩნდება. გაგრძელდეს?')) return;
-    if (project && project.is_published !== isPublished) {
-      const action = isPublished ? 'საჯაროდ გამოქვეყნდეს' : 'საჯარო პორტფოლიოდან მოიხსნას და მონახაზად დარჩეს';
-      if (!window.confirm(`პროექტი ${action}. გსურთ გაგრძელება?`)) return;
+    // One confirmation that lists every visible consequence, instead of a chain of prompts.
+    const consequences: string[] = [];
+    if (isPublished && (!project || !project.is_published)) consequences.push('პროექტი საიტზე გამოჩნდება.');
+    if (!isPublished && project?.is_published) consequences.push('პროექტი საიტზე აღარ გამოჩნდება.');
+    if (project?.cover_image_path && newCover) consequences.push('მთავარი სურათი შეიცვლება (ძველი ფაილი შენახული რჩება).');
+    if (project && project.presentation_type !== presentationType) {
+      consequences.push(presentationType === 'image' ? 'დაჭერისას მხოლოდ მთავარი სურათი გაიხსნება.' : 'დაჭერისას პროექტის გალერეა გაიხსნება.');
     }
-    if (project?.cover_image_path && newCover && !window.confirm('ახალი ქავერი ჩაენაცვლება პროექტის მიმდინარე ქავერს. ძველი ფაილი არ წაიშლება. გსურთ გაგრძელება?')) return;
-    if (project && project.presentation_type !== presentationType && !window.confirm('პროექტის ჩვენების ფორმატი შეიცვლება. არსებული სურათები არ წაიშლება. გსურთ გაგრძელება?')) return;
+    if (consequences.length > 0 && !await adminConfirm({
+      title: 'შენახვა',
+      message: consequences.join(' '),
+      confirmLabel: 'შენახვა',
+    })) return;
 
     setIsSaving(true);
     setErrorMessage('');
-    setSaveStatus('პროექტის მონახაზი მზადდება...');
+    setSaveStatus('ინახება...');
     let newProjectCreated = false;
     const projectId = project?.id ?? draftProjectId ?? crypto.randomUUID();
     const slug = project?.slug ?? `project-${projectId.replaceAll('-', '').slice(0, 12)}`;
@@ -362,7 +386,7 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
       }
 
       if (newCover) {
-        setSaveStatus('ქავერის სურათი იტვირთება...');
+        setSaveStatus('მთავარი სურათი იტვირთება...');
         nextCoverPath = await uploadImage(projectId, newCover);
         setCoverPath(nextCoverPath);
         setNewCover(null);
@@ -443,7 +467,7 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
       onSaved(project ? 'პროექტის ცვლილებები წარმატებით შეინახა.' : 'ახალი პროექტი წარმატებით შეიქმნა.');
     } catch {
       setErrorMessage(!project && (newProjectCreated || draftProjectId)
-        ? 'პროექტის მონახაზი შეიქმნა, თუმცა ატვირთვა ან შენახვა ბოლომდე ვერ დასრულდა. მონახაზი პროექტების სიაში დაგხვდებათ და ხელახლა შეძლებთ გაგრძელებას.'
+        ? 'პროექტი შეიქმნა, მაგრამ ატვირთვა ბოლომდე ვერ დასრულდა. ის დამალულია პროექტებში — გახსენით და სცადეთ ხელახლა.'
         : 'შენახვა ვერ მოხერხდა. შეამოწმეთ კავშირი, ატვირთვის წესები და ადმინისტრატორის უფლებები, შემდეგ სცადეთ თავიდან.');
       setSaveStatus('');
       setIsSaving(false);
@@ -454,13 +478,12 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
     <div
       className="admin-editor-backdrop"
       role="presentation"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}
+      onMouseDown={(event) => { if (event.target === event.currentTarget) void requestClose(); }}
     >
       <section className="admin-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-editor-title" lang="ka-GE">
         <header className="admin-editor-header">
           <div>
-            <p className="admin-eyebrow">პორტფოლიოს მართვა</p>
-            <h2 id="admin-editor-title">{project ? 'პროექტის რედაქტირება' : 'პროექტის დამატება'}</h2>
+            <h2 id="admin-editor-title">{project ? 'პროექტის შეცვლა' : 'ახალი პროექტი'}</h2>
           </div>
           <button className="admin-icon-button" type="button" aria-label="რედაქტორის დახურვა" onClick={requestClose} disabled={isSaving}>
             <X aria-hidden="true" />
@@ -475,29 +498,10 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
           <div className="admin-editor-main-grid">
             <div className="admin-editor-fields">
               <section className="admin-editor-section">
-                <div className="admin-editor-section-heading"><span>01</span><h3>ძირითადი ინფორმაცია</h3></div>
+                <div className="admin-editor-section-heading"><span>01</span><h3>სათაური და კატეგორია</h3></div>
                 <label className="admin-editor-field">
-                  <span>პროექტის სათაური <i>*</i></span>
+                  <span>სათაური <i>*</i></span>
                   <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required placeholder="მაგალითად, ბრენდის ვიზუალური იდენტობა" />
-                </label>
-                <label className="admin-editor-field">
-                  <span>აღწერა</span>
-                  <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} maxLength={5000} placeholder="მოკლედ აღწერეთ პროექტი..." />
-                  <small>{new Intl.NumberFormat('ka-GE').format(description.length)} / {new Intl.NumberFormat('ka-GE').format(5000)}</small>
-                </label>
-                <label className="admin-editor-field">
-                  <span>ინსტრუმენტები</span>
-                  <input value={toolsText} onChange={(event) => setToolsText(event.target.value)} maxLength={500} placeholder="მაგალითად, Adobe Illustrator, Photoshop" />
-                  <small>გამოყავით მძიმეებით ან ახალ ხაზზე.</small>
-                </label>
-                <label className="admin-editor-field">
-                  <span>თეგები</span>
-                  <input value={tagsText} onChange={(event) => setTagsText(event.target.value)} maxLength={500} placeholder="მაგალითად, ბრენდინგი, ვიზუალური იდენტობა" />
-                  <small>გამოყავით მძიმეებით ან ახალ ხაზზე.</small>
-                </label>
-                <label className="admin-editor-field admin-editor-year-field">
-                  <span>წელი</span>
-                  <input type="number" min="1900" max="9999" step="1" inputMode="numeric" value={yearText} onChange={(event) => setYearText(event.target.value)} placeholder="მაგ. 2026" />
                 </label>
                 <label className="admin-editor-field">
                   <span>კატეგორია <i>*</i></span>
@@ -509,17 +513,13 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
                   </select>
                 </label>
                 <label className="admin-editor-field">
-                  <span>ჩვენების ფორმატი <i>*</i></span>
-                  <select value={presentationType} onChange={(event) => setPresentationType(event.target.value as 'image' | 'project')}>
-                    <option value="image">ერთი სურათის ბარათი</option>
-                    <option value="project">პროექტი გალერეით</option>
-                  </select>
-                  <small>{presentationType === 'image' ? 'ბარათზე დაჭერისას ფოტო სრულ ხედში გაიხსნება.' : 'ბარათზე დაჭერისას პროექტის გვერდი და გალერეა გაიხსნება.'}</small>
+                  <span>აღწერა <em>არასავალდებულო</em></span>
+                  <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} maxLength={5000} placeholder="ორი-სამი წინადადება პროექტზე..." />
                 </label>
               </section>
 
               <section className="admin-editor-section">
-                <div className="admin-editor-section-heading"><span>02</span><h3>ქავერის სურათი</h3></div>
+                <div className="admin-editor-section-heading"><span>02</span><h3>მთავარი სურათი</h3></div>
                 <input
                   ref={coverInputRef}
                   className="admin-visually-hidden"
@@ -530,16 +530,16 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
                 />
                 {coverPreview ? (
                   <div className="admin-editor-cover-preview">
-                    <img src={coverPreview} alt={`${title || 'პროექტის'} ქავერის წინასწარი ხედი`} />
-                    <span>{newCover || (coverPath && coverPath !== project?.cover_image_path) ? 'ახალი ქავერი' : 'მიმდინარე ქავერი'}</span>
+                    <img src={coverPreview} alt={`${title || 'პროექტის'} მთავარი სურათი`} />
+                    <span>{newCover || (coverPath && coverPath !== project?.cover_image_path) ? 'ახალი სურათი' : 'მიმდინარე სურათი'}</span>
                     <button type="button" className="admin-button admin-button-quiet" onClick={() => coverInputRef.current?.click()} disabled={galleryLoading || isSaving}>
-                      <Upload aria-hidden="true" /> ქავერის შეცვლა
+                      <Upload aria-hidden="true" /> სურათის შეცვლა
                     </button>
                   </div>
                 ) : (
                   <button type="button" className="admin-editor-upload-zone" onClick={() => coverInputRef.current?.click()} disabled={galleryLoading || isSaving}>
                     <span><ImagePlus aria-hidden="true" /></span>
-                    <strong>ატვირთეთ ქავერის სურათი</strong>
+                    <strong>ატვირთეთ მთავარი სურათი</strong>
                     <small>JPG, PNG, WEBP ან AVIF · მაქსიმუმ 50 მბ</small>
                     <Upload aria-hidden="true" />
                   </button>
@@ -549,33 +549,58 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
 
             <aside className="admin-editor-options">
               <section className="admin-editor-section">
-                <div className="admin-editor-section-heading"><span>03</span><h3>გამოქვეყნება</h3></div>
+                <div className="admin-editor-section-heading"><span>03</span><h3>საიტზე ჩვენება</h3></div>
                 <label className="admin-editor-toggle">
                   <input type="checkbox" checked={isPublished} onChange={(event) => setIsPublished(event.target.checked)} />
                   <span className="admin-editor-toggle-mark" />
-                  <span><strong>გამოქვეყნებულია</strong><small>{isPublished ? 'საჯაროდ გამოჩნდება პორტფოლიოში' : 'მხოლოდ ადმინისტრატორისთვის ხილული მონახაზია'}</small></span>
-                </label>
-                <label className="admin-editor-toggle">
-                  <input type="checkbox" checked={isFeatured} onChange={(event) => setIsFeatured(event.target.checked)} />
-                  <span className="admin-editor-toggle-mark" />
-                  <span><strong>რჩეული პროექტი</strong><small>გამოიყენება რჩეული ნამუშევრის გამოსაყოფად</small></span>
-                  <Star aria-hidden="true" />
-                </label>
-                <label className="admin-editor-field admin-editor-order-field">
-                  <span>ჩვენების რიგი</span>
-                  <input type="number" min="0" step="1" inputMode="numeric" value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} />
+                  <span><strong>{isPublished ? 'საიტზე ჩანს' : 'დამალულია'}</strong><small>{isPublished ? 'შენახვისას საიტზე გამოჩნდება' : 'შეინახება, მაგრამ საიტზე არ გამოჩნდება'}</small></span>
                 </label>
               </section>
-              <div className="admin-editor-policy-note">
-                <CircleAlert aria-hidden="true" />
-                <p>გამოქვეყნება დასტურდება ცალკე. არსებული პროექტებისა და სურათების წაშლა ამ ეტაპზე გამორთულია.</p>
-              </div>
+
+              <details className="admin-editor-more">
+                <summary>დამატებითი <small>ინსტრუმენტები, თეგები, წელი, რიგი</small></summary>
+                <div className="admin-editor-more-body">
+                  <label className="admin-editor-field">
+                    <span>ინსტრუმენტები</span>
+                    <input value={toolsText} onChange={(event) => setToolsText(event.target.value)} maxLength={500} placeholder="Illustrator, Photoshop" />
+                  </label>
+                  <label className="admin-editor-field">
+                    <span>თეგები</span>
+                    <input value={tagsText} onChange={(event) => setTagsText(event.target.value)} maxLength={500} placeholder="ბრენდინგი, ლოგო" />
+                    <small>გამოყავით მძიმით.</small>
+                  </label>
+                  <div className="admin-editor-more-row">
+                    <label className="admin-editor-field">
+                      <span>წელი</span>
+                      <input type="number" min="1900" max="9999" step="1" inputMode="numeric" value={yearText} onChange={(event) => setYearText(event.target.value)} placeholder="2026" />
+                    </label>
+                    <label className="admin-editor-field">
+                      <span>რიგი</span>
+                      <input type="number" min="0" step="1" inputMode="numeric" value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} />
+                    </label>
+                  </div>
+                  <label className="admin-editor-toggle">
+                    <input type="checkbox" checked={isFeatured} onChange={(event) => setIsFeatured(event.target.checked)} />
+                    <span className="admin-editor-toggle-mark" />
+                    <span><strong>რჩეული</strong><small>გამოსაყოფად მონიშნული ნამუშევარი</small></span>
+                    <Star aria-hidden="true" />
+                  </label>
+                </div>
+              </details>
             </aside>
           </div>
 
           <section className="admin-editor-section admin-editor-gallery-section">
             <div className="admin-editor-section-heading admin-editor-gallery-heading">
-              <div><span>04</span><h3>გალერეის სურათები</h3></div>
+              <div><span>04</span><h3>დამატებითი სურათები</h3></div>
+              <div className="admin-editor-format" role="radiogroup" aria-label="როგორ გაიხსნას პროექტი">
+                <button type="button" role="radio" aria-checked={presentationType === 'image'} onClick={() => { setPresentationType('image'); setHasUnsavedChanges(true); }}>
+                  მხოლოდ ერთი სურათი
+                </button>
+                <button type="button" role="radio" aria-checked={presentationType === 'project'} onClick={() => { setPresentationType('project'); setHasUnsavedChanges(true); }}>
+                  სურათების გალერეა
+                </button>
+              </div>
               <div className="admin-editor-gallery-actions">
                 <span>{new Intl.NumberFormat('ka-GE').format(gallery.length)} სურათი</span>
                 <input
@@ -591,14 +616,18 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
                 </button>
               </div>
             </div>
-            <p className="admin-editor-helper">{presentationType === 'image' ? 'ინდივიდუალური სურათის ფორმატისთვის გალერეა ცარიელი უნდა იყოს.' : 'გადაათრიეთ სურათები რიგის შესაცვლელად, ან გამოიყენეთ ისრიანი ღილაკები.'} შენახვისას არსებული ფაილები არ იშლება.</p>
+            <p className="admin-editor-helper">{presentationType === 'image'
+              ? 'საიტზე დაჭერისას მხოლოდ მთავარი სურათი გაიხსნება. თუ პროექტს მეტი სურათი აქვს, აირჩიეთ „სურათების გალერეა“.'
+              : 'საიტზე დაჭერისას გაიხსნება პროექტის გვერდი ამ სურათებით. რიგის შესაცვლელად გადაათრიეთ.'}</p>
 
             {galleryLoading ? (
               <div className="admin-editor-loading" role="status"><LoaderCircle className="admin-spin" aria-hidden="true" />გალერეა იტვირთება...</div>
             ) : gallery.length === 0 ? (
-              <button className="admin-editor-empty-gallery" type="button" onClick={() => galleryInputRef.current?.click()}>
-                <ImagePlus aria-hidden="true" /> გალერეის სურათები ჯერ არ არის
-              </button>
+              presentationType === 'image' ? null : (
+                <button className="admin-editor-empty-gallery" type="button" onClick={() => galleryInputRef.current?.click()}>
+                  <ImagePlus aria-hidden="true" /> სურათების დამატება
+                </button>
+              )
             ) : (
               <div className="admin-editor-gallery-list">
                 {gallery.map((item, index) => (

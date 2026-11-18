@@ -1,0 +1,286 @@
+.website-template-section { scroll-margin-top: 96px; }
+.website-template-spacing--compact { padding-block: 34px; }
+.website-template-spacing--comfortable { padding-block: 58px; }
+.website-template-spacing--spacious { padding-block: 84px; }
+.website-template-background--soft { background: var(--brand-panel); }
+.website-template-background--dark { background: var(--brand-accent); color: var(--brand-on-accent); }
+.website-template-background--dark .section-title,
+.website-template-background--dark .website-template-subheading,
+.website-template-background--dark .website-template-card h3,
+.website-template-background--dark .website-template-stat strong { color: var(--brand-on-accent); }
+.website-template-background--dark .section-subtitle,
+.website-template-background--dark .website-template-card p,
+.website-template-background--dark .website-template-stat span { color: rgb(255 255 255 / 0.76); }
+.website-template-accent--copper { --website-template-accent: var(--brand-copper); }
+.website-template-accent--neutral { --website-template-accent: var(--brand-muted); }
+.website-template-accent--forest { --website-template-accent: var(--brand-accent); }
+.website-template-section .website-template-icon { color: var(--website-template-accent, var(--brand-accent)); }
+.website-template-section .website-template-stat strong { color: var(--website-template-accent, var(--brand-accent)); }
+.website-template-section .website-template-testimonial > svg { color: var(--website-template-accent, var(--brand-copper)); }
+.website-template-type--editorial .section-title,.website-template-type--editorial .website-template-subheading { font-family: var(--brand-font-display, inherit); }
+.website-template-type--compact .section-title { font-size: 30px; }
+.website-template-type--compact .section-subtitle,.website-template-type--compact .website-template-paragraph { font-size: 12px; }
+.website-template-content { display: grid; gap: 22px; }
+.website-template-content > .section-title { max-width: 850px; }
+.website-template-align--center { justify-items: center; text-align: center; }
+.website-template-align--center > * { margin-inline: auto; }
+.website-template-layout--two-column { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
+.website-template-layout--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.website-template-subheading { color: var(--brand-ink); font-size: 1.3rem; font-weight: 750; line-height: 1.4; }
+.website-template-paragraph { max-width: 760px; line-height: 1.85; white-space: pre-line; }
+.website-template-button { justify-self: start; }
+.website-template-image { min-width: 0; overflow: hidden; border: 1px solid var(--brand-line); border-radius: 12px; background: var(--brand-panel); }
+.website-template-image img { display: block; width: 100%; max-height: 620px; object-fit: cover; }
+.website-template-image figcaption { padding: 9px 12px; color: var(--brand-muted); font-size: 11px; }
+.website-template-image-placeholder { display: grid; min-height: 220px; place-content: center; justify-items: center; gap: 8px; border: 1px dashed var(--brand-line-strong); border-radius: 12px; color: var(--brand-muted); font-size: 12px; }
+.website-template-image-placeholder svg { width: 24px; height: 24px; color: var(--brand-accent); }
+.website-template-icon { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: var(--brand-accent-soft); color: var(--brand-accent); }
+.website-template-icon svg { width: 18px; height: 18px; }
+.website-template-divider { width: 100%; border: 0; border-top: 1px solid var(--brand-line); }
+.website-template-feature-grid,.website-template-group-items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.website-template-card,.website-template-stat,.website-template-testimonial { min-width: 0; padding: 20px; border: 1px solid var(--brand-line); border-radius: 11px; background: var(--brand-panel); }
+.website-template-card { display: flex; flex-direction: column; align-items: flex-start; gap: 11px; }
+.website-template-card h3 { color: var(--brand-ink); font-size: 15px; font-weight: 750; line-height: 1.5; }
+.website-template-card p { color: var(--brand-muted); font-size: 12px; line-height: 1.8; white-space: pre-line; }
+.website-template-stat { display: grid; gap: 4px; }
+.website-template-stat strong { color: var(--brand-accent); font-size: 36px; font-weight: 800; }
+.website-template-stat span { color: var(--brand-muted); font-size: 11px; }
+.website-template-faq { padding: 15px 0; border-top: 1px solid var(--brand-line); text-align: start; }
+.website-template-faq summary { color: var(--brand-ink); font-weight: 700; cursor: pointer; }
+.website-template-faq p { margin-top: 10px; color: var(--brand-muted); font-size: 12px; line-height: 1.8; white-space: pre-line; }
+.website-template-testimonial { display: grid; gap: 12px; }
+.website-template-testimonial > svg { color: var(--brand-copper); }
+.website-template-testimonial blockquote { color: var(--brand-ink); font-size: 14px; line-height: 1.85; }
+.website-template-testimonial figcaption { color: var(--brand-muted); font-size: 11px; font-weight: 700; }
+.website-template-logo { display: grid; min-height: 90px; place-items: center; padding: 15px; border: 1px solid var(--brand-line); border-radius: 9px; color: var(--brand-ink); font-weight: 750; }
+.website-template-logo img { max-width: 100%; max-height: 52px; object-fit: contain; }
+.website-template-cta { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: clamp(22px, 4vw, 42px); border: 1px solid var(--brand-line); border-radius: 12px; background: var(--brand-panel-strong); text-align: start; }
+.website-template-cta h3 { color: var(--brand-ink); font-size: 30px; font-weight: 800; line-height: 1.4; }
+.website-template-cta p { margin-top: 8px; color: var(--brand-muted); font-size: 12px; line-height: 1.8; }
+.website-template-background--dark .website-template-cta { border-color: rgb(255 255 255 / 0.18); background: rgb(255 255 255 / 0.06); }
+.website-template-background--dark .website-template-cta h3 { color: #fff; }
+.website-template-background--dark .website-template-cta p { color: rgb(255 255 255 / 0.76); }
+.website-template-background--dark .website-template-card,
+.website-template-background--dark .website-template-stat,
+.website-template-background--dark .website-template-testimonial { border-color: rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); }
+.website-inserted-blocks { padding-top: 24px; padding-bottom: 24px; }
+
+.website-canvas-edit-mode [data-website-editor-target],
+.website-canvas-edit-mode [data-website-editor-block] { cursor: crosshair !important; }
+.website-canvas-edit-mode [data-website-editor-target]:hover > *,
+.website-canvas-edit-mode [data-website-editor-block]:hover > * {
+  outline: 1px dashed color-mix(in srgb, var(--brand-accent) 72%, transparent);
+  outline-offset: 4px;
+}
+.website-canvas-edit-mode [data-website-editor-inline-field][contenteditable="plaintext-only"] {
+  min-width: .5em;
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+  cursor: text !important;
+  user-select: text;
+}
+.website-canvas-edit-mode [data-website-editor-dragging="true"] {
+  transition: transform 90ms linear;
+  filter: drop-shadow(0 14px 20px rgb(12 29 21 / 22%));
+}
+.website-canvas-edit-mode [data-website-editor-drop-target] > * {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 5px;
+}
+.website-canvas-section-mode [data-website-editor-section-root]:hover {
+  outline: 2px dashed color-mix(in srgb, var(--brand-accent) 78%, transparent);
+  outline-offset: -5px;
+}
+.website-canvas-multiple-mode [data-website-editor-block]:hover > *,
+.website-canvas-multiple-mode [data-website-editor-target]:hover > * {
+  outline: 1px dashed color-mix(in srgb, var(--brand-accent) 78%, transparent);
+  outline-offset: 4px;
+}
+.website-editor-marquee {
+  position: fixed;
+  z-index: 99999;
+  border: 1px solid var(--brand-accent);
+  background: color-mix(in srgb, var(--brand-accent) 13%, transparent);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 82%);
+  pointer-events: none;
+}
+.website-editor-hidden-section-marker {
+  display: flex;
+  position: relative;
+  z-index: 12;
+  height: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: visible;
+  color: var(--brand-muted);
+  font: 600 10px/1.3 var(--brand-font-sans);
+}
+.website-editor-hidden-section-marker > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.website-editor-hidden-section-marker button {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--brand-line));
+  border-radius: 4px;
+  background: var(--brand-panel-solid);
+  color: var(--brand-accent);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 10%);
+  cursor: pointer;
+  font: inherit;
+}
+.website-editor-hidden-section-marker button:hover { background: color-mix(in srgb, var(--brand-accent) 12%, transparent); }
+.website-editor-hidden-section-marker button svg { width: 13px; height: 13px; }
+
+@media (max-width: 760px) {
+  .website-template-type--compact .section-title { font-size: 24px; }
+  .website-template-stat strong { font-size: 28px; }
+  .website-template-cta h3 { font-size: 22px; }
+  .website-template-responsive--desktop { display: none !important; }
+  .website-template-spacing--compact { padding-block: 28px; }
+  .website-template-spacing--comfortable { padding-block: 42px; }
+  .website-template-spacing--spacious { padding-block: 58px; }
+  .website-template-layout--two-column,.website-template-layout--grid,.website-template-feature-grid,.website-template-group-items { grid-template-columns: minmax(0, 1fr); }
+  .website-template-cta { align-items: flex-start; flex-direction: column; }
+}
+
+@media (min-width: 761px) {
+  .website-template-responsive--mobile { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .website-template-section { scroll-behavior: auto; }
+}
+
+/* Text and pictures placed freely on a section. Their place, size and look come from the
+   compiled element styles; these are only the defaults. The frame becomes the positioning
+   box (and its own stacking layer, so an item never covers the header) only when it has items. */
+.site-section-frame.has-free { position: relative; isolation: isolate; }
+.site-free-layer { position: absolute; inset: 0; pointer-events: none; }
+.site-free-item {
+  position: absolute;
+  top: 48px;
+  left: 8%;
+  z-index: 10;
+  width: 30%;
+  min-height: 16px;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+.site-free-text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.2; }
+.site-free-item > img { display: block; width: 100%; height: auto; max-width: none; user-select: none; -webkit-user-drag: none; }
+.site-free-handle { display: none; }
+
+/* Admin visual editor: the page behaves like a document to edit, not a site to use.
+   Hover cards, moving strips, pointer cursors and form fields are switched off. */
+html[data-website-editor] .wp-reveal { display: none !important; }
+html[data-website-editor] .scroll-to-top,
+html[data-website-editor] .field-control { pointer-events: none; }
+html[data-website-editor] a,
+html[data-website-editor] button,
+html[data-website-editor] label { cursor: default !important; }
+html[data-website-editor] [data-website-editor-inline-field] { border-radius: 3px; cursor: text !important; transition: background-color 120ms ease, box-shadow 120ms ease; }
+html[data-website-editor] [data-website-editor-inline-field]:hover {
+  background: color-mix(in srgb, var(--brand-accent) 16%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 16%, transparent);
+}
+html[data-website-editor] [data-website-editor-inline-field][contenteditable] {
+  background: color-mix(in srgb, var(--brand-accent) 10%, transparent);
+  box-shadow: none;
+}
+/* Variant A: only the texts light up; no element outlines or crosshair. */
+html[data-website-editor="inline"] .website-canvas-edit-mode [data-website-editor-target],
+html[data-website-editor="inline"] .website-canvas-edit-mode [data-website-editor-block] { cursor: default !important; }
+html[data-website-editor="inline"] .website-canvas-edit-mode [data-website-editor-target]:hover > *,
+html[data-website-editor="inline"] .website-canvas-edit-mode [data-website-editor-block]:hover > * { outline: none; }
+/* Variant A element editing: every editable part reacts to the pointer; hidden parts stay
+   visible (dimmed) in the editor so they can be brought back. */
+html[data-website-editor="inline"] [data-edit-id] { cursor: pointer !important; transition: outline-color 120ms ease, background-color 120ms ease; }
+html[data-website-editor="inline"] [data-edit-id]:not([data-edit-kind="text"]):hover {
+  outline: 2px solid color-mix(in srgb, var(--brand-accent) 75%, transparent);
+  outline-offset: 3px;
+}
+html[data-website-editor="inline"] [data-edit-text] { cursor: text !important; border-radius: 3px; }
+html[data-website-editor="inline"] [data-edit-text]:hover {
+  background: color-mix(in srgb, var(--brand-accent) 16%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-accent) 16%, transparent);
+}
+html[data-website-editor] [data-edit-text][contenteditable] { background: color-mix(in srgb, var(--brand-accent) 10%, transparent); box-shadow: none; outline: 2px solid var(--brand-accent); outline-offset: 3px; }
+html[data-website-editor] [data-edit-hidden="true"] {
+  opacity: 0.32;
+  outline: 1px dashed var(--brand-muted);
+  outline-offset: 3px;
+}
+html[data-website-editor] .website-editor-hover-tag {
+  position: fixed;
+  z-index: 2147483000;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #1b1a17;
+  color: #f6f3ee;
+  font: 600 12px/1.5 system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+}
+/* Free items in the editor: drag to move; handles appear on the selected one. */
+html[data-website-editor="inline"] .site-free-item { cursor: move !important; touch-action: none; user-select: none; }
+html[data-website-editor="inline"] .site-free-item .site-free-text { cursor: move !important; }
+/* A picture that can't load still shows a box, so it can be selected and replaced. */
+html[data-website-editor="inline"] .site-free-item.is-image { min-height: 40px; }
+html[data-website-editor="inline"] .site-free-item .site-free-text[contenteditable] { cursor: text !important; user-select: text; }
+html[data-website-editor="inline"] .site-free-item[data-free-selected] { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+html[data-website-editor="inline"] .site-free-item[data-free-dragging] { outline-style: dashed; }
+html[data-website-editor="inline"] .site-free-item[data-free-selected] > .site-free-handle {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--brand-accent);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+html[data-website-editor="inline"] .site-free-handle.is-resize { right: -10px; bottom: -10px; cursor: nwse-resize !important; }
+html[data-website-editor="inline"] .site-free-handle.is-crop { left: 50%; bottom: -7px; width: 30px !important; height: 12px !important; margin-left: -15px; border-radius: 6px !important; cursor: ns-resize !important; }
+html[data-website-editor="inline"] .site-free-handle.is-rotate { left: 50%; top: -38px; margin-left: -9px; border-radius: 50% !important; cursor: grab !important; }
+html[data-website-editor="inline"] .site-free-handle.is-rotate::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  width: 2px;
+  height: 20px;
+  background: var(--brand-accent);
+  transform: translateX(-50%);
+}
+/* The poster strip stands still in the editor; scroll it sideways to reach every poster. */
+html[data-website-editor] .work-strip { overflow-x: auto; scrollbar-width: thin; pointer-events: auto; }
+/* Draft preview (opened from the editor): a quiet reminder that this isn't live yet. */
+.draft-preview-banner {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #1b1a17;
+  color: #f6f3ee;
+  font-size: 13px;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.3);
+}

@@ -1,0 +1,166 @@
+.calculator-palette-copper { --brand-accent: var(--brand-copper); --brand-accent-rgb: var(--brand-copper-rgb); --brand-accent-soft: var(--brand-copper-soft); --brand-accent-wash: rgb(var(--brand-copper-rgb) / 0.06); --brand-on-accent: #fff; }
+.calculator-palette-plum { --brand-accent: var(--brand-plum); --brand-accent-rgb: var(--brand-plum-rgb); --brand-accent-soft: rgb(var(--brand-plum-rgb) / 0.12); --brand-accent-wash: rgb(var(--brand-plum-rgb) / 0.06); --brand-on-accent: #fff; }
+#calculator[data-calculator-typography="compact"] .section-title { font-size: clamp(1.6rem, 2.6vw, 2.6rem); }
+#calculator[data-calculator-typography="compact"] .section-subtitle { font-size: 0.9rem; }
+.calculator-load-warning { margin: 0 0 12px; padding: 9px 12px; border: 1px solid var(--brand-line); border-radius: 7px; color: var(--brand-muted); font-size: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #calculator *, #calculator *::before, #calculator *::after { scroll-behavior: auto !important; }
+}
+
+/*
+ * ---------- Calculator ----------
+ * Price tags on services, discount marks on the quantity scale with a nudge, the estimate as a
+ * printed receipt (itemised lines that come and go, dotted leaders, a counting total, barcode,
+ * scalloped edge), a soft accent light that follows the pointer, and an accent outline on what
+ * is chosen. (These rules sit outside any layer, so they win over the shared control styles in
+ * site.css.)
+ */
+
+/* A soft accent light follows the pointer across the card; the summary has a quiet tint. */
+.calc.surface-card-strong {
+  background: radial-gradient(560px circle at var(--sx, 20%) var(--sy, 0%), rgb(var(--brand-accent-rgb) / 0.09), transparent 45%);
+}
+.calc .calc-summary {
+  background: linear-gradient(165deg, rgb(var(--brand-accent-rgb) / 0.13), transparent 55%), var(--brand-page-soft);
+}
+
+/* Tabs: the underline glides from one tab to the other. */
+.calc .segmented-item { position: relative; isolation: isolate; }
+.calc .segmented-item[aria-selected="true"] { border-bottom-color: transparent; }
+.calc .calc-tab-icon,
+.calc .calc-tab-label { position: relative; z-index: 1; }
+.calc .calc-tab-indicator { position: absolute; right: 0; bottom: -2px; left: 0; height: 2px; background: var(--brand-ink); }
+
+/* Choices: what is chosen gets an accent outline and glow. */
+.calc .choice-tile { transition: border-color 250ms ease, box-shadow 350ms ease, background-color 250ms ease, color 200ms ease; }
+.calc .choice-tile:hover { border-color: var(--brand-line-strong); }
+.calc .choice-tile[aria-pressed="true"] {
+  border-color: var(--brand-accent);
+  background: linear-gradient(180deg, rgb(var(--brand-accent-rgb) / 0.08), transparent 70%);
+  box-shadow: 0 0 0 1px var(--brand-accent), 0 16px 34px -18px rgb(var(--brand-accent-rgb) / 0.7);
+}
+.calc .choice-tile[aria-pressed="true"]::before {
+  border-color: var(--brand-accent);
+  box-shadow: inset 0 0 0 3px var(--brand-page), inset 0 0 0 7px var(--brand-accent);
+}
+
+.calc .calc-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; }
+.calc .calc-tile-price {
+  margin-top: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--brand-line);
+  border-radius: 999px;
+  color: var(--brand-ink);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 200ms ease, background-color 200ms ease, color 200ms ease;
+}
+.calc .calc-tile[aria-pressed="true"] .calc-tile-price { border-color: var(--brand-accent); background: var(--brand-accent); color: var(--brand-on-accent); }
+
+.calc .calc-option-chip {
+  margin-left: auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(var(--brand-accent-rgb) / 0.12);
+  color: var(--brand-accent);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Quantity scale: both ends and where discounts begin. */
+.smooth-range-block { display: flex; flex-direction: column; gap: 6px; }
+.smooth-range-marks { position: relative; height: 16px; margin: 0 11px; color: var(--brand-soft); font-size: 11px; }
+.smooth-range-marks > span {
+  position: absolute;
+  top: 0;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition: color 300ms ease;
+}
+.smooth-range-marks > span:first-child { translate: -20% 0; }
+.smooth-range-marks > span:last-child { translate: -80% 0; }
+.smooth-range-marks > span.is-discount { color: var(--brand-muted); font-weight: 600; }
+.smooth-range-marks > span.is-discount.is-reached { color: var(--brand-accent); }
+
+.calc-nudge { display: flex; align-items: center; gap: 10px; color: var(--brand-muted); font-size: 13px; }
+.calc-nudge-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--brand-accent);
+  box-shadow: 0 0 0 0 rgb(var(--brand-accent-rgb) / 0.45);
+  animation: calc-pulse 2.2s ease-out infinite;
+}
+@keyframes calc-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--brand-accent-rgb) / 0.45); }
+  70%, 100% { box-shadow: 0 0 0 9px rgb(var(--brand-accent-rgb) / 0); }
+}
+
+/* Summary: a printed receipt. */
+.calc-summary { gap: 32px; justify-content: space-between; }
+.calc-summary-body { display: flex; flex-direction: column; gap: 22px; }
+.calc-receipt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 22px 18px;
+  border-radius: 4px 4px 0 0;
+  background: var(--brand-page);
+  box-shadow: 0 22px 40px -28px rgb(0 0 0 / 0.5);
+}
+/* Scalloped tear-off edge. */
+.calc-receipt::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -9px;
+  left: 0;
+  height: 10px;
+  background: radial-gradient(circle at 7px 10px, transparent 6px, var(--brand-page) 6.5px) repeat-x;
+  background-size: 14px 10px;
+}
+.calc-receipt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.calc-receipt-date { color: var(--brand-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.calc-meta { display: grid; gap: 8px; margin: 0; font-size: 14px; }
+.calc-meta > div { display: flex; justify-content: space-between; gap: 16px; }
+.calc-meta dt { color: var(--brand-muted); }
+.calc-meta dd { margin: 0; color: var(--brand-ink); font-weight: 600; text-align: right; }
+.calc-meta,
+.calc-lines { padding-top: 12px; border-top: 1px dashed var(--brand-line-strong); }
+.calc-lines { margin: 0; list-style: none; font-size: 14px; padding-left: 0; padding-right: 0; padding-bottom: 0; }
+.calc-line { overflow: hidden; }
+.calc-line-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 0; color: var(--brand-muted); }
+.calc-line-label { min-width: 0; }
+.calc-line-fill { min-width: 12px; flex: 1; border-bottom: 1px dotted var(--brand-line-strong); translate: 0 -4px; }
+.calc-line-amount { flex: none; color: var(--brand-ink); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.calc-line.is-discount .calc-line-amount { color: var(--brand-accent); }
+.calc-line.is-rounding { opacity: 0.7; font-size: 13px; }
+.calc-line-note { margin-top: -6px; color: var(--brand-soft); font-size: 12px; }
+.calc-total-row { display: flex; flex-direction: column; gap: 6px; padding-top: 16px; border-top: 1px dashed var(--brand-line-strong); }
+.calc-total-label { color: var(--brand-muted); font-size: 14px; }
+.calc-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; color: var(--brand-ink); font-size: clamp(2.1rem, 3.6vw, 3.2rem); line-height: 1.05; }
+.calc-total-num { white-space: nowrap; }
+.calc-total small { color: var(--brand-muted); font-family: var(--brand-font-sans); font-size: 15px; font-weight: 500; }
+.calc-receipt-code {
+  display: block;
+  height: 26px;
+  margin-top: 4px;
+  opacity: 0.55;
+  background: repeating-linear-gradient(90deg, var(--brand-ink) 0 2px, transparent 2px 4px, var(--brand-ink) 4px 5px, transparent 5px 8px, var(--brand-ink) 8px 11px, transparent 11px 13px);
+}
+.calc-summary-text { color: var(--brand-muted); font-size: 13.5px; line-height: 1.7; }
+.calc .calc-cta { gap: 10px; }
+.calc .calc-cta svg { transition: translate 300ms cubic-bezier(0.16, 1, 0.3, 1); }
+.calc .calc-cta:hover svg { translate: 4px 0; }
+.calc-cta-note { margin-top: 10px; color: var(--brand-soft); font-size: 12px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .calc-nudge-dot { animation: none; }
+  .calc .choice-tile { transition: none; }
+}

@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type FormEvent, type ReactNode } from 'react';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   ArrowUpRight,
   BadgeCheck,
+  Calculator,
   BriefcaseBusiness,
   Check,
   CheckCircle2,
   CircleAlert,
+  Eye,
+  EyeOff,
   FolderOpen,
+  GripVertical,
   Image as ImageIcon,
   LayoutDashboard,
+  LayoutTemplate,
   LoaderCircle,
   LockKeyhole,
   LogOut,
@@ -20,75 +25,85 @@ import {
   Search,
   Settings2,
   Shapes,
+  RotateCcw,
+  Trash2,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ProjectEditor from './ProjectEditor';
 import CategoryEditor, { type AdminCategory } from './CategoryEditor';
+import PortfolioOrganizer from './PortfolioOrganizer';
+import CalculatorManagement from './CalculatorManagement';
+import WebsiteSectionsManager from './WebsiteSectionsManager';
+import { getAdminAuthorizationTransition, withTimeout } from '../lib/authLifecycle';
 import { getCategoryAdminLabel } from './labels';
+import {
+  ADMIN_SCHEMA_UNCHECKED,
+  checkAdminSchema,
+  isMissingColumn,
+  missingAdminMigrations,
+  supabaseSqlEditorUrl,
+  type AdminSchemaHealth,
+  type SchemaProbeClient,
+} from './schemaHealth';
+import { getAttentionIssues, type AttentionIssue, type ProjectStatusFilter } from './attention';
+import { AdminFeedbackHost, adminConfirm, adminToast } from './feedback';
+import WorksManager from './WorksManager';
+import CategoriesView from './CategoriesView';
+import CommandPalette from './CommandPalette';
+import SiteSettingsView from './SiteSettingsView';
+import type { AdminCategoryRow, AdminProjectRow, BulkProjectAction } from './types';
 import './admin.css';
 
-type AdminSection = 'overview' | 'projects' | 'categories' | 'media' | 'settings';
+const PROJECT_COLUMNS = 'id, source_key, slug, title, description, category_id, presentation_type, cover_image_path, display_order, is_published, is_featured, tags, tools, year, created_at';
+const SQL_EDITOR_URL = supabaseSqlEditorUrl(import.meta.env.VITE_SUPABASE_URL);
+
+type AdminSection = 'overview' | 'projects' | 'categories' | 'settings' | 'trash' | 'calculator' | 'website-sections';
+type AdminNavigationItem = { id: AdminSection; label: string; Icon: LucideIcon };
+type AdminNavigationGroup = { label: string; items: AdminNavigationItem[] };
 type GateState = 'loading' | 'unconfigured' | 'signed-out' | 'checking' | 'denied' | 'error' | 'authorized';
 
-type Category = {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  display_order: number;
-  is_active: boolean;
-};
+type Category = AdminCategoryRow;
+type PortfolioProject = AdminProjectRow;
 
-type PortfolioProject = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  category_id: string;
-  presentation_type: 'image' | 'project';
-  cover_image_path: string | null;
-  display_order: number;
-  is_published: boolean;
-  is_featured: boolean;
-  tags: string[];
-  tools: string[];
-  year: number | null;
-  created_at: string;
-};
+const navigationGroups: AdminNavigationGroup[] = [
+  {
+    label: 'პორტფოლიო',
+    items: [
+      { id: 'overview', label: 'მთავარი', Icon: LayoutDashboard },
+      { id: 'projects', label: 'პროექტები', Icon: BriefcaseBusiness },
+      { id: 'categories', label: 'კატეგორიები', Icon: Shapes },
+    ],
+  },
+  {
+    label: 'საიტი',
+    items: [
+      { id: 'website-sections', label: 'ტექსტები', Icon: LayoutTemplate },
+      { id: 'calculator', label: 'ფასები', Icon: Calculator },
+      { id: 'settings', label: 'კონტაქტი და სტატუსი', Icon: Settings2 },
+    ],
+  },
+];
+const WHERE_LINKS: { id: AdminSection; label: string; text: string; Icon: LucideIcon }[] = [
+  { id: 'website-sections', label: 'ტექსტები', text: 'სათაურები, აღწერები და ღილაკები მთავარ გვერდზე', Icon: LayoutTemplate },
+  { id: 'calculator', label: 'ფასები', text: 'სერვისები და ფასები კალკულატორში', Icon: Calculator },
+  { id: 'settings', label: 'კონტაქტი და სტატუსი', text: 'სოციალური ბმულები, მდებარეობა, „ხელმისაწვდომი ვარ“', Icon: Settings2 },
+  { id: 'categories', label: 'კატეგორიები', text: 'პოსტერები, ბრენდინგი, ბილბორდები და სხვა', Icon: Shapes },
+];
 
-type SiteSetting = {
-  setting_key: string;
-  setting_value: unknown;
-  updated_at: string;
-};
+// Trash is reached from the Projects page, so it is not a sidebar item.
+const navigation: AdminNavigationItem[] = [
+  ...navigationGroups.flatMap((group) => group.items),
+  { id: 'trash', label: 'წაშლილი', Icon: Trash2 },
+];
 
-type SiteContent = {
-  id: string;
-  content_key: string;
-  locale: string;
-  content: unknown;
-  is_published: boolean;
-  display_order: number;
-  updated_at: string;
+const ATTENTION_COPY: Record<AttentionIssue['id'], { title: string; text: string; action: string }> = {
+  'placeholder-title': { title: 'სათაური ფაილის სახელიდანაა', text: 'ეს პროექტები იმპორტისას ფაილის სახელს ატარებს („1 result“ და მსგავსი). მიეცით გასაგები სათაური.', action: 'სათაურების შეცვლა' },
+  'no-cover': { title: 'მთავარი სურათი არ აქვს', text: 'მთავარი სურათის გარეშე პროექტი საიტზე ვერ გამოჩნდება.', action: 'სურათების დამატება' },
+  draft: { title: 'დამალული ნამუშევრები', text: 'ეს ნამუშევრები საიტზე არ ჩანს. თუ მზადაა, გახსენით და დააჭირეთ „ჩანს“.', action: 'პროექტების გახსნა' },
+  'empty-category': { title: 'ცარიელი კატეგორია', text: 'აქტიურ კატეგორიაში არცერთი პროექტი არ არის. დაამატეთ პროექტები ან დამალეთ კატეგორია.', action: 'კატეგორიების ნახვა' },
 };
-
-type MediaAsset = {
-  id: string;
-  projectTitle: string;
-  path: string;
-  altText: string;
-  signedUrl: string;
-  kind: 'cover' | 'gallery';
-};
-
-const navigation = [
-  { id: 'overview', label: 'მიმოხილვა', Icon: LayoutDashboard },
-  { id: 'projects', label: 'პროექტები', Icon: BriefcaseBusiness },
-  { id: 'categories', label: 'კატეგორიები', Icon: Shapes },
-  { id: 'media', label: 'მედია', Icon: ImageIcon },
-  { id: 'settings', label: 'საიტის პარამეტრები', Icon: Settings2 },
-] as const;
 
 const formatNumber = (value: number) => new Intl.NumberFormat('ka-GE').format(value);
 const formatDate = (value: string) =>
@@ -111,6 +126,15 @@ function getAuthMessage(error: { message?: string; code?: string } | null | unde
   }
 
   return 'შესვლა ვერ მოხერხდა. გადაამოწმეთ ელფოსტა და პაროლი.';
+}
+
+function logAdminAuthDiagnostic(event: string, outcome: string, durationMs?: number) {
+  if (!import.meta.env.DEV) return;
+  console.info('[admin-auth]', {
+    event,
+    outcome,
+    ...(durationMs === undefined ? {} : { durationMs: Math.round(durationMs) }),
+  });
 }
 
 function StatusScreen({
@@ -197,8 +221,8 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (session: Session) => void })
   };
 
   return (
-    <main className="admin-auth-screen" lang="ka-GE">
-      <section className="admin-auth-panel">
+    <main className="admin-auth-screen admin-auth-screen-v3" lang="ka-GE">
+      <section className="admin-auth-panel admin-auth-panel-v3">
         <a className="admin-brand" href="/" aria-label="Luka Imagines — მთავარ საიტზე დაბრუნება">
           <span className="admin-brand-mark" aria-hidden="true">LI</span>
           <span className="admin-brand-copy">
@@ -264,7 +288,7 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (session: Session) => void })
           წვდომა ენიჭება მხოლოდ ავტორიზებულ ადმინისტრატორებს.
         </p>
       </section>
-      <div className="admin-auth-aside" aria-hidden="true">
+      <div className="admin-auth-aside admin-auth-aside-v3" aria-hidden="true">
         <span>LI</span>
         <p>იდეა, ფორმა<br />და ხასიათი.</p>
         <i />
@@ -273,22 +297,23 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (session: Session) => void })
   );
 }
 
-function StatCard({ label, value, detail, Icon, tone }: {
+function StatCard({ label, value, detail, Icon, tone, onClick }: {
   label: string;
   value: number;
   detail: string;
   Icon: typeof BriefcaseBusiness;
   tone: 'green' | 'copper' | 'plum' | 'ink';
+  onClick?: () => void;
 }) {
   return (
-    <article className="admin-stat-card">
+    <button type="button" className={`admin-stat-card admin-stat-card-v3 tone-${tone}`} onClick={onClick}>
       <div className={`admin-stat-icon tone-${tone}`}><Icon aria-hidden="true" /></div>
       <div className="admin-stat-copy">
         <span>{label}</span>
         <strong>{formatNumber(value)}</strong>
         <small>{detail}</small>
       </div>
-    </article>
+    </button>
   );
 }
 
@@ -302,67 +327,165 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   );
 }
 
+type WebsiteSectionsBoundaryProps = { children: ReactNode };
+type WebsiteSectionsBoundaryState = { hasError: boolean };
+type WebsiteSectionsBoundaryInstance = {
+  props: WebsiteSectionsBoundaryProps;
+  state: WebsiteSectionsBoundaryState;
+  setState: (state: WebsiteSectionsBoundaryState) => void;
+};
+const ErrorBoundaryBase = Component as unknown as new (props: WebsiteSectionsBoundaryProps) => WebsiteSectionsBoundaryInstance;
+
+class WebsiteSectionsErrorBoundary extends ErrorBoundaryBase {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    console.error('[WebsiteSectionsManager] render failed', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="admin-feature-error" role="alert" lang="ka-GE">
+          <CircleAlert aria-hidden="true" />
+          <div>
+            <h2>საიტის სექციების გახსნა ვერ მოხერხდა</h2>
+            <p>დანარჩენი მართვის პანელი მუშაობს. სცადეთ ხელახლა; პრობლემა გაგრძელების შემთხვევაში მოგვაწოდეთ ბრაუზერის Console-ის შეცდომა.</p>
+          </div>
+          <button type="button" className="admin-button admin-button-primary" onClick={() => this.setState({ hasError: false })}>
+            ხელახლა ცდა
+          </button>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function AdminPanel() {
   const [gate, setGate] = useState<GateState>('loading');
   const [session, setSession] = useState<Session | null>(null);
   const [gateMessage, setGateMessage] = useState('');
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
   const [projects, setProjects] = useState<PortfolioProject[]>([]);
+  const [coverPreviewByProject, setCoverPreviewByProject] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<Category[]>([]);
   const [galleryCount, setGalleryCount] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardError, setDashboardError] = useState('');
-  const [projectSearch, setProjectSearch] = useState('');
-  const [settings, setSettings] = useState<SiteSetting[]>([]);
-  const [siteContent, setSiteContent] = useState<SiteContent[]>([]);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [media, setMedia] = useState<MediaAsset[]>([]);
-  const [mediaLoading, setMediaLoading] = useState(false);
-  const [mediaLoaded, setMediaLoaded] = useState(false);
-  const [sectionError, setSectionError] = useState('');
+  const [trashSearch, setTrashSearch] = useState('');
+  const [projectStatusFilter, setProjectStatusFilter] = useState<ProjectStatusFilter>('all');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [projectActionId, setProjectActionId] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [projectEditorTarget, setProjectEditorTarget] = useState<PortfolioProject | null | undefined>(undefined);
+  const [organizerOpen, setOrganizerOpen] = useState(false);
   const [categoryEditorTarget, setCategoryEditorTarget] = useState<AdminCategory | null | undefined>(undefined);
   const [saveNotice, setSaveNotice] = useState('');
   const [categoryNotice, setCategoryNotice] = useState('');
+  const [calculatorDirty, setCalculatorDirty] = useState(false);
+  const [websiteSectionsDirty, setWebsiteSectionsDirty] = useState(false);
+  const [schemaHealth, setSchemaHealth] = useState<AdminSchemaHealth>(ADMIN_SCHEMA_UNCHECKED);
+  const coverUrlCache = useRef(new Map<string, { url: string; at: number }>());
   const authorizationRequest = useRef(0);
+  const authorizedUserId = useRef<string | null>(null);
+  const authorizationInFlight = useRef<{ userId: string; requestId: number; promise: Promise<void> } | null>(null);
 
-  const verifySession = useCallback(async (nextSession: Session | null) => {
-    const currentRequest = ++authorizationRequest.current;
+  const verifySession = useCallback(async (
+    nextSession: Session | null,
+    source = 'manual',
+    force = false,
+  ) => {
     setSession(nextSession);
-    setGateMessage('');
 
     if (!nextSession) {
+      authorizationRequest.current += 1;
+      authorizationInFlight.current = null;
+      authorizedUserId.current = null;
+      setGateMessage('');
       setGate('signed-out');
+      logAdminAuthDiagnostic(source, 'signed-out');
       return;
     }
 
     const client = supabase;
     if (!client) {
       setGate('unconfigured');
+      logAdminAuthDiagnostic(source, 'unconfigured');
       return;
     }
 
-    setGate('checking');
-    const { data, error } = await client
-      .from('authorized_administrators')
-      .select('user_id')
-      .eq('user_id', nextSession.user.id)
-      .maybeSingle();
+    const userId = nextSession.user.id;
+    const transition = getAdminAuthorizationTransition(userId, authorizedUserId.current);
+    const blocksAdminShell = force || transition === 'blocking-check';
 
-    if (currentRequest !== authorizationRequest.current) return;
-    if (error) {
-      setGate('error');
-      setGateMessage('ადმინისტრატორის წვდომის შემოწმება ვერ მოხერხდა. გადაამოწმეთ კავშირი და მონაცემთა ბაზის წვდომის წესები.');
-      return;
-    }
-    if (!data) {
-      setGate('denied');
-      return;
+    // Revalidate a known user without unmounting the dashboard on routine auth refresh events.
+    if (blocksAdminShell) {
+      authorizedUserId.current = null;
+      setGateMessage('');
+      setGate('checking');
     }
 
-    setGate('authorized');
+    const existing = authorizationInFlight.current;
+    if (!force && existing?.userId === userId) {
+      logAdminAuthDiagnostic(source, blocksAdminShell ? 'blocking-check-coalesced' : 'background-check-coalesced');
+      await existing.promise;
+      return;
+    }
+
+    const requestId = ++authorizationRequest.current;
+    const startedAt = performance.now();
+    logAdminAuthDiagnostic(source, blocksAdminShell ? 'blocking-check-started' : 'background-check-started');
+    const request = (async () => {
+      try {
+        const { data, error } = await withTimeout(
+          client
+            .from('authorized_administrators')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle(),
+          12_000,
+        );
+
+        if (requestId !== authorizationRequest.current) return;
+        if (error) {
+          setGate('error');
+          setGateMessage('ადმინისტრატორის წვდომის შემოწმება ვერ მოხერხდა. გადაამოწმეთ ინტერნეტ-კავშირი და მონაცემთა ბაზის წვდომის წესები, შემდეგ სცადეთ ხელახლა.');
+          logAdminAuthDiagnostic(source, 'check-failed', performance.now() - startedAt);
+          return;
+        }
+        if (!data) {
+          authorizedUserId.current = null;
+          setGate('denied');
+          setGateMessage('');
+          logAdminAuthDiagnostic(source, 'not-authorized', performance.now() - startedAt);
+          return;
+        }
+
+        authorizedUserId.current = userId;
+        setGate('authorized');
+        setGateMessage('');
+        logAdminAuthDiagnostic(source, 'authorized', performance.now() - startedAt);
+      } catch (failure) {
+        if (requestId !== authorizationRequest.current) return;
+        const timedOut = failure instanceof Error && failure.message === 'authorization_timeout';
+        setGate('error');
+        setGateMessage(timedOut
+          ? 'ადმინისტრატორის უფლებების შემოწმებას 12 წამზე მეტი დასჭირდა. შეამოწმეთ ინტერნეტ-კავშირი და სცადეთ ხელახლა.'
+          : 'ადმინისტრატორის წვდომის შემოწმება ვერ მოხერხდა. გადაამოწმეთ ინტერნეტ-კავშირი და სცადეთ ხელახლა.');
+        logAdminAuthDiagnostic(source, timedOut ? 'timeout' : 'check-failed', performance.now() - startedAt);
+      } finally {
+        if (authorizationInFlight.current?.requestId === requestId) authorizationInFlight.current = null;
+      }
+    })();
+
+    authorizationInFlight.current = { userId, requestId, promise: request };
+    await request;
   }, []);
 
   useEffect(() => {
@@ -403,45 +526,59 @@ export default function AdminPanel() {
     }
 
     let active = true;
-    const { data: { subscription } } = client.auth.onAuthStateChange((_event, nextSession) => {
+    const bootstrapRequest = authorizationRequest.current;
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, nextSession) => {
       window.setTimeout(() => {
-        if (active) void verifySession(nextSession);
+        if (active) void verifySession(nextSession, event);
       }, 0);
     });
 
-    void client.auth.getSession().then(({ data, error }) => {
+    void withTimeout(client.auth.getSession(), 12_000).then(({ data, error }) => {
       if (!active) return;
+      if (authorizationRequest.current !== bootstrapRequest) return;
       if (error) {
         setGate('error');
         setGateMessage(getAuthMessage(error));
+        logAdminAuthDiagnostic('getSession', 'restore-failed');
         return;
       }
-      void verifySession(data.session);
-    }).catch(() => {
+      void verifySession(data.session, 'getSession');
+    }).catch((failure: unknown) => {
       if (!active) return;
+      if (authorizationRequest.current !== bootstrapRequest) return;
       setGate('error');
-      setGateMessage('სესიის აღდგენა ვერ მოხერხდა. განაახლეთ გვერდი და სცადეთ თავიდან.');
+      const timedOut = failure instanceof Error && failure.message === 'authorization_timeout';
+      setGateMessage(timedOut
+        ? 'სესიის აღდგენას 12 წამზე მეტი დასჭირდა. სცადეთ ხელახლა.'
+        : 'სესიის აღდგენა ვერ მოხერხდა. განაახლეთ გვერდი და სცადეთ თავიდან.');
+      logAdminAuthDiagnostic('getSession', timedOut ? 'restore-timeout' : 'restore-failed');
     });
 
     return () => {
       active = false;
       authorizationRequest.current += 1;
+      authorizationInFlight.current = null;
+      authorizedUserId.current = null;
       subscription.unsubscribe();
     };
   }, [verifySession]);
 
-  const loadDashboard = useCallback(async () => {
+  // A silent reload keeps the current screen mounted (no loading state), e.g. after an upload.
+  const loadDashboard = useCallback(async (options: { silent?: boolean } = {}) => {
     const client = supabase;
     if (!client) return;
 
-    setDashboardLoading(true);
+    if (!options.silent) setDashboardLoading(true);
     setDashboardError('');
-    const [projectResult, categoryResult, galleryResult] = await Promise.all([
-      client
-        .from('portfolio_projects')
-        .select('id, slug, title, description, category_id, presentation_type, cover_image_path, display_order, is_published, is_featured, tags, tools, year, created_at')
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false }),
+    try {
+    const queryProjects = (columns: string) => client
+      .from('portfolio_projects')
+      .select(columns)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    const [fullProjectResult, categoryResult, galleryResult, health] = await Promise.all([
+      queryProjects(`${PROJECT_COLUMNS}, deleted_at, deleted_by`),
       client
         .from('portfolio_categories')
         .select('id, slug, name, description, display_order, is_active')
@@ -449,134 +586,76 @@ export default function AdminPanel() {
       client
         .from('portfolio_gallery_images')
         .select('id', { count: 'exact', head: true }),
+      checkAdminSchema(client as unknown as SchemaProbeClient).catch(() => null),
     ]);
+    if (health) setSchemaHealth(health);
 
-    const error = projectResult.error || categoryResult.error || galleryResult.error;
-    if (error) {
-      setDashboardError('მონაცემების ჩატვირთვა ვერ მოხერხდა. სცადეთ ხელახლა.');
-      setDashboardLoading(false);
-      return;
+    // Before the trash migration runs on this database, load projects without the trash
+    // columns and treat every project as active, instead of failing the whole dashboard.
+    let projectResult: { data: unknown[] | null; error: unknown } = fullProjectResult;
+    if (isMissingColumn(fullProjectResult.error)) {
+      const fallback = await queryProjects(PROJECT_COLUMNS);
+      projectResult = {
+        error: fallback.error,
+        data: (fallback.data ?? []).map((project) => ({ ...(project as object), deleted_at: null, deleted_by: null })),
+      };
     }
 
-    setProjects((projectResult.data ?? []) as PortfolioProject[]);
+    const error = projectResult.error || categoryResult.error || galleryResult.error;
+    if (error) throw error;
+
+    const nextProjects = (projectResult.data ?? []) as PortfolioProject[];
+    setProjects(nextProjects);
     setCategories((categoryResult.data ?? []) as Category[]);
     setGalleryCount(galleryResult.count ?? 0);
-    setDashboardLoading(false);
+
+    const coverPaths = [...new Set(nextProjects
+      .filter((project) => project.deleted_at === null && project.cover_image_path)
+      .map((project) => project.cover_image_path as string))];
+    // Reuse recent signed links so thumbnails don't reload on every refresh; links last 10 min.
+    const now = Date.now();
+    const cache = coverUrlCache.current;
+    const toSign = coverPaths.filter((path) => !cache.has(path) || now - cache.get(path)!.at > 8 * 60 * 1000);
+    if (toSign.length > 0) {
+      try {
+        const { data: signedCovers, error: signedCoverError } = await client
+          .storage.from('portfolio-images').createSignedUrls(toSign, 600);
+        if (!signedCoverError) {
+          for (const item of signedCovers ?? []) {
+            if (item.signedUrl && item.path) cache.set(item.path, { url: item.signedUrl, at: now });
+          }
+        }
+      } catch {
+        // Keep whatever links are cached; missing thumbnails fall back to an icon.
+      }
+    }
+    setCoverPreviewByProject(Object.fromEntries(nextProjects.flatMap((project) => {
+      const signedUrl = project.cover_image_path ? cache.get(project.cover_image_path)?.url : undefined;
+      return signedUrl ? [[project.id, signedUrl]] : [];
+    })));
+    } catch {
+      setDashboardError('მონაცემების ჩატვირთვა ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა.');
+    } finally {
+      setDashboardLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     if (gate === 'authorized') void loadDashboard();
   }, [gate, loadDashboard]);
 
+  // Ctrl/⌘+K opens the quick menu anywhere in the signed-in panel.
   useEffect(() => {
-    const client = supabase;
-    if (gate !== 'authorized' || activeSection !== 'settings' || settingsLoaded || !client) return;
-
-    let active = true;
-    setSettingsLoading(true);
-    setSectionError('');
-    void Promise.all([
-      client
-        .from('site_settings')
-        .select('setting_key, setting_value, updated_at')
-        .order('setting_key', { ascending: true }),
-      client
-        .from('site_content')
-        .select('id, content_key, locale, content, is_published, display_order, updated_at')
-        .order('display_order', { ascending: true })
-        .order('content_key', { ascending: true }),
-    ]).then(([settingsResult, contentResult]) => {
-        if (!active) return;
-        if (settingsResult.error || contentResult.error) {
-          setSectionError('პარამეტრების ჩატვირთვა ვერ მოხერხდა. გადაამოწმეთ წვდომის წესები და სცადეთ ხელახლა.');
-        } else {
-          setSettings((settingsResult.data ?? []) as SiteSetting[]);
-          setSiteContent((contentResult.data ?? []) as SiteContent[]);
-          setSettingsLoaded(true);
-        }
-        setSettingsLoading(false);
-      });
-
-    return () => { active = false; };
-  }, [activeSection, gate, settingsLoaded]);
-
-  useEffect(() => {
-    const client = supabase;
-    if (gate !== 'authorized' || activeSection !== 'media' || mediaLoaded || !client) return;
-
-    let active = true;
-    setMediaLoading(true);
-    setSectionError('');
-    void client
-      .from('portfolio_gallery_images')
-      .select('id, project_id, image_path, alt_text, display_order')
-      .order('display_order', { ascending: true })
-      .then(async ({ data, error }) => {
-        if (!active) return;
-        if (error) {
-          setSectionError('მედიის ბიბლიოთეკის ჩატვირთვა ვერ მოხერხდა. სცადეთ ხელახლა.');
-          setMediaLoading(false);
-          return;
-        }
-
-        const galleryImages = (data ?? []) as Array<{
-          id: string;
-          project_id: string;
-          image_path: string;
-          alt_text: string;
-          display_order: number;
-        }>;
-        const projectById = new Map<string, PortfolioProject>(
-          projects.map((project) => [project.id, project]),
-        );
-        const references: Omit<MediaAsset, 'signedUrl'>[] = [
-          ...projects.flatMap((project) => project.cover_image_path ? [{
-            id: `${project.id}-cover`,
-            projectTitle: project.title,
-            path: project.cover_image_path,
-            altText: project.title,
-            kind: 'cover' as const,
-          }] : []),
-          ...galleryImages.map((image) => ({
-            id: image.id,
-            projectTitle: projectById.get(image.project_id)?.title ?? image.project_id,
-            path: image.image_path,
-            altText: image.alt_text,
-            kind: 'gallery' as const,
-          })),
-        ];
-        const uniquePaths = [...new Set(references.map((item) => item.path))];
-
-        if (uniquePaths.length === 0) {
-          setMedia([]);
-          setMediaLoaded(true);
-          setMediaLoading(false);
-          return;
-        }
-
-        const signedResult = await client.storage.from('portfolio-images').createSignedUrls(uniquePaths, 600);
-        if (!active) return;
-        if (signedResult.error) {
-          setSectionError('სურათების უსაფრთხო ბმულების შექმნა ვერ მოხერხდა. გადაამოწმეთ Storage-ის წესები.');
-          setMediaLoading(false);
-          return;
-        }
-
-        const signedUrls = new Map(
-          (signedResult.data ?? [])
-            .filter((item) => item.signedUrl)
-            .map((item) => [item.path, item.signedUrl as string]),
-        );
-        setMedia(references.flatMap((item) => {
-          const signedUrl = signedUrls.get(item.path);
-          return signedUrl ? [{ ...item, signedUrl }] : [];
-        }));
-        setMediaLoaded(true);
-        setMediaLoading(false);
-      });
-
-    return () => { active = false; };
-  }, [activeSection, gate, mediaLoaded, projects]);
+    if (gate !== 'authorized') return;
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [gate]);
 
   const handleSignOut = async () => {
     const client = supabase;
@@ -596,16 +675,154 @@ export default function AdminPanel() {
   };
 
   const activeTitle = navigation.find((item) => item.id === activeSection)?.label ?? 'მიმოხილვა';
-  const filteredProjects = useMemo(() => {
-    const normalizedSearch = projectSearch.trim().toLocaleLowerCase('ka-GE');
-    if (!normalizedSearch) return projects;
-    return projects.filter((project) =>
-      `${project.title} ${project.slug}`.toLocaleLowerCase('ka-GE').includes(normalizedSearch),
-    );
-  }, [projectSearch, projects]);
+  const filteredTrash = useMemo(() => {
+    const normalizedSearch = trashSearch.trim().toLocaleLowerCase('ka-GE');
+    return projects
+      .filter((project) => project.deleted_at !== null
+        && (!normalizedSearch || `${project.title} ${project.slug}`.toLocaleLowerCase('ka-GE').includes(normalizedSearch)))
+      .sort((first, second) => (second.deleted_at ?? '').localeCompare(first.deleted_at ?? ''));
+  }, [projects, trashSearch]);
   const categoryLabelForId = (categoryId: string) => {
     const category = categories.find((item) => item.id === categoryId);
     return category ? getCategoryAdminLabel(category) : 'კატეგორია არ არის მითითებული';
+  };
+
+  const runProjectAction = async (project: PortfolioProject, action: 'publish' | 'unpublish' | 'trash' | 'restore' | 'delete') => {
+    const client = supabase;
+    if (!client || projectActionId) return;
+
+    if (action === 'publish' && !project.cover_image_path) {
+      adminToast('საიტზე გამოსაჩენად ჯერ მთავარი სურათი დაამატეთ.', 'error');
+      return;
+    }
+    const confirmations: Record<typeof action, Parameters<typeof adminConfirm>[0]> = {
+      publish: { title: 'საიტზე ჩვენება', message: `„${project.title}“ გამოჩნდება საიტზე.`, confirmLabel: 'ჩვენება' },
+      unpublish: { title: 'დამალვა', message: `„${project.title}“ საიტზე აღარ გამოჩნდება.`, confirmLabel: 'დამალვა' },
+      trash: { title: 'წაშლა', message: `„${project.title}“ საიტიდან წაიშლება. თუ გადაიფიქრებთ, „წაშლილებიდან“ აღადგენთ.`, confirmLabel: 'წაშლა', tone: 'danger' },
+      restore: { title: 'აღდგენა', message: `„${project.title}“ დაბრუნდება თავის ადგილას${project.is_published ? ' და გამოჩნდება საიტზე' : ''}.`, confirmLabel: 'აღდგენა' },
+      delete: { title: 'სამუდამო წაშლა', message: `„${project.title}“ და მისი გალერეის ჩანაწერები სამუდამოდ წაიშლება. ამის გაუქმება შეუძლებელია. საცავში ატვირთული სურათის ფაილები უცვლელი დარჩება.`, confirmLabel: 'სამუდამოდ წაშლა', tone: 'danger', requireText: 'წაშლა' },
+    };
+    if (!await adminConfirm(confirmations[action])) return;
+
+    setProjectActionId(project.id);
+    setDashboardError('');
+    setSaveNotice('');
+    try {
+      let result;
+      if (action === 'delete') {
+        result = await client.from('portfolio_projects')
+          .delete()
+          .eq('id', project.id)
+          .not('deleted_at', 'is', null)
+          .select('id')
+          .maybeSingle();
+      } else if (action === 'trash') {
+        result = await client.from('portfolio_projects')
+          .update({
+            deleted_at: new Date().toISOString(),
+            deleted_by: session?.user.id ?? null,
+            trashed_display_order: project.display_order,
+          })
+          .eq('id', project.id)
+          .is('deleted_at', null)
+          .select('id')
+          .maybeSingle();
+      } else if (action === 'restore') {
+        result = await client.rpc('restore_trashed_portfolio_project', { p_project_id: project.id });
+      } else {
+        const update = client.from('portfolio_projects')
+          .update({ is_published: action === 'publish' })
+          .eq('id', project.id);
+        // The deleted_at guard only exists once the trash migration has run.
+        result = await (schemaHealth.trash ? update.is('deleted_at', null) : update)
+          .select('id')
+          .maybeSingle();
+      }
+      if (result.error || !result.data) throw new Error('project_action_failed');
+
+      const messages = {
+        publish: 'პროექტი წარმატებით გამოქვეყნდა.',
+        unpublish: 'დაიმალა — საიტზე აღარ ჩანს.',
+        trash: 'წაიშალა. აღდგენა შეგიძლიათ „წაშლილებიდან“.',
+        restore: 'პროექტი ნაგვიდან აღდგა.',
+        delete: 'პროექტი და მისი გალერეის ჩანაწერები სამუდამოდ წაიშალა. სურათების საცავის ფაილები შენარჩუნებულია.',
+      };
+      adminToast(messages[action]);
+      await loadDashboard({ silent: true });
+    } catch {
+      adminToast('მოქმედება ვერ შესრულდა. გადაამოწმეთ ინტერნეტ-კავშირი და სცადეთ ხელახლა.', 'error');
+    } finally {
+      setProjectActionId('');
+    }
+  };
+
+  /** Publish, unpublish or trash several projects in one request; resolves true on success. */
+  const runBulkProjectAction = async (ids: string[], action: BulkProjectAction) => {
+    const client = supabase;
+    if (!client || ids.length === 0) return false;
+    const chosen = projects.filter((project) => ids.includes(project.id) && project.deleted_at === null);
+    const withoutCover = action === 'publish' ? chosen.filter((project) => !project.cover_image_path) : [];
+    const targets = chosen.filter((project) => !withoutCover.includes(project));
+    if (targets.length === 0) {
+      adminToast('მონიშნულ პროექტებს მთავარი სურათი არ აქვთ, ამიტომ ვერ გამოქვეყნდება.', 'error');
+      return false;
+    }
+
+    const count = formatNumber(targets.length);
+    const skipped = withoutCover.length ? ` ${formatNumber(withoutCover.length)} პროექტი მთავარი სურათის გარეშეა და გამოტოვდება.` : '';
+    const confirmed = await adminConfirm(
+      action === 'publish'
+        ? { title: `${count} პროექტის გამოქვეყნება`, message: `მონიშნული პროექტები საჯაროდ გამოჩნდება.${skipped}`, confirmLabel: 'გამოქვეყნება' }
+        : action === 'unpublish'
+          ? { title: `${count} პროექტის მოხსნა`, message: 'მონიშნული ნამუშევრები საიტზე აღარ გამოჩნდება.', confirmLabel: 'დამალვა' }
+          : { title: `${count} ნამუშევრის წაშლა`, message: 'მონიშნული ნამუშევრები საიტიდან წაიშლება. აღდგენა შეგიძლიათ „წაშლილებიდან“.', confirmLabel: 'წაშლა', tone: 'danger' },
+    );
+    if (!confirmed) return false;
+
+    try {
+      const targetIds = targets.map((project) => project.id);
+      if (action === 'trash') {
+        // Each row keeps its own position so a restore puts it back where it was.
+        const results = await Promise.all(targets.map((project) => client.from('portfolio_projects')
+          .update({ deleted_at: new Date().toISOString(), deleted_by: session?.user.id ?? null, trashed_display_order: project.display_order })
+          .eq('id', project.id)
+          .is('deleted_at', null)));
+        if (results.some((result) => result.error)) throw new Error('bulk_trash_failed');
+      } else {
+        const update = client.from('portfolio_projects').update({ is_published: action === 'publish' }).in('id', targetIds);
+        const { error } = await (schemaHealth.trash ? update.is('deleted_at', null) : update);
+        if (error) throw error;
+      }
+      adminToast(action === 'publish'
+        ? `${count} პროექტი გამოქვეყნდა.${skipped}`
+        : action === 'unpublish' ? `${count} პროექტი საიტიდან მოიხსნა.` : `${count} ნამუშევარი წაიშალა.`);
+      await loadDashboard({ silent: true });
+      return true;
+    } catch {
+      adminToast('ერთდროული მოქმედება ვერ შესრულდა. სცადეთ ხელახლა.', 'error');
+      await loadDashboard({ silent: true });
+      return false;
+    }
+  };
+
+  const goToSection = async (id: AdminSection) => {
+    if (id === activeSection) return;
+    if (activeSection === 'calculator' && calculatorDirty
+      && !await adminConfirm({ title: 'შეუნახავი ცვლილებები', message: 'კალკულატორში შეუნახავი ცვლილებებია. დატოვების შემთხვევაში ისინი დაიკარგება.', confirmLabel: 'დატოვება', tone: 'danger' })) return;
+    if (activeSection === 'website-sections' && websiteSectionsDirty
+      && !await adminConfirm({ title: 'შეუნახავი ცვლილებები', message: 'საიტის სექციებში შეუნახავი ცვლილებებია. დატოვების შემთხვევაში ისინი დაიკარგება.', confirmLabel: 'დატოვება', tone: 'danger' })) return;
+    if (activeSection === 'settings' && settingsDirty
+      && !await adminConfirm({ title: 'შეუნახავი ცვლილებები', message: 'პარამეტრებში შეუნახავი ცვლილებებია. დატოვების შემთხვევაში ისინი დაიკარგება.', confirmLabel: 'დატოვება', tone: 'danger' })) return;
+    if (activeSection === 'calculator') setCalculatorDirty(false);
+    if (activeSection === 'website-sections') setWebsiteSectionsDirty(false);
+    setActiveSection(id);
+    document.querySelector('.admin-main')?.scrollTo?.({ top: 0 });
+    window.scrollTo({ top: 0 });
+  };
+
+  const openProjectsWith = (filter: ProjectStatusFilter) => {
+    setProjectStatusFilter(filter);
+    void goToSection('projects');
   };
 
   if (gate === 'loading' || gate === 'checking') {
@@ -645,7 +862,7 @@ export default function AdminPanel() {
       <StatusScreen
         title="წვდომის დადასტურება ვერ მოხერხდა"
         message={gateMessage || 'ადმინისტრატორის უფლებების შემოწმება ვერ მოხერხდა.'}
-        action={() => { void verifySession(session); }}
+        action={() => { void verifySession(session, 'retry', true); }}
         actionLabel="ხელახლა ცდა"
         secondaryAction={() => { void handleSignOut(); }}
         secondaryLabel="სისტემიდან გასვლა"
@@ -653,18 +870,21 @@ export default function AdminPanel() {
     );
   }
 
+  const activeProjects = projects.filter((project) => project.deleted_at === null);
+  const trashedProjects = projects.filter((project) => project.deleted_at !== null);
+  const missingMigrations = missingAdminMigrations(schemaHealth);
+  const attentionIssues: AttentionIssue[] = getAttentionIssues(activeProjects, categories);
   const projectsByCategory = categories.map((category) => ({
     ...category,
-    projectCount: projects.filter((project) => project.category_id === category.id).length,
+    projectCount: activeProjects.filter((project) => project.category_id === category.id).length,
   }));
-  const publishedCount = projects.filter((project) => project.is_published).length;
-  const draftCount = projects.length - publishedCount;
+  const publishedCount = activeProjects.filter((project) => project.is_published).length;
+  const draftCount = activeProjects.length - publishedCount;
   const activeCategoryCount = categories.filter((category) => category.is_active).length;
-
   return (
-    <div className="admin-shell" lang="ka-GE">
-      <div className="admin-layout">
-        <aside className="admin-sidebar">
+    <div className="admin-shell admin-shell-v3" lang="ka-GE">
+      <div className="admin-layout admin-layout-v3">
+        <aside className="admin-sidebar admin-sidebar-v3">
           <a className="admin-brand" href="/" aria-label="Luka Imagines — მთავარ საიტზე დაბრუნება">
             <span className="admin-brand-mark" aria-hidden="true">LI</span>
             <span className="admin-brand-copy">
@@ -673,22 +893,24 @@ export default function AdminPanel() {
             </span>
           </a>
 
-          <div className="admin-sidebar-caption">სამუშაო სივრცე</div>
-          <nav className="admin-nav" aria-label="მართვის სექციები">
-            {navigation.map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                type="button"
-                className={`admin-nav-item ${activeSection === id ? 'is-active' : ''}`}
-                onClick={() => {
-                  setActiveSection(id);
-                  setSectionError('');
-                }}
-              >
-                <Icon aria-hidden="true" />
-                <span>{label}</span>
-                {activeSection === id && <span className="admin-nav-marker" aria-hidden="true"><Check /></span>}
-              </button>
+          <nav className="admin-nav admin-nav-v3" aria-label="მართვის სექციები">
+            {navigationGroups.map((group) => (
+              <div className="admin-nav-group" key={group.label}>
+                <span className="admin-nav-group-label">{group.label}</span>
+                {group.items.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`admin-nav-item ${activeSection === id ? 'is-active' : ''}`}
+                    onClick={() => { void goToSection(id); }}
+                  >
+                    <Icon aria-hidden="true" />
+                    <span>{label}</span>
+                    {id === 'trash' && trashedProjects.length > 0 && <span className="admin-nav-count">{formatNumber(trashedProjects.length)}</span>}
+                    {activeSection === id && <span className="admin-nav-marker" aria-hidden="true"><Check /></span>}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
 
@@ -704,7 +926,16 @@ export default function AdminPanel() {
               aria-label="სისტემიდან გასვლა"
               title="სისტემიდან გასვლა"
               disabled={isSigningOut}
-              onClick={() => { void handleSignOut(); }}
+              onClick={async () => {
+                if ((calculatorDirty || websiteSectionsDirty) && !await adminConfirm({
+                  title: 'შეუნახავი ცვლილებები',
+                  message: 'გასვლის შემთხვევაში შეუნახავი ცვლილებები დაიკარგება.',
+                  confirmLabel: 'გასვლა',
+                  tone: 'danger',
+                })) return;
+                if (!(calculatorDirty || websiteSectionsDirty) && !await adminConfirm({ title: 'სისტემიდან გასვლა', message: 'ხელახლა შესასვლელად ელფოსტა და პაროლი დაგჭირდებათ.', confirmLabel: 'გასვლა' })) return;
+                void handleSignOut();
+              }}
             >
               {isSigningOut ? <LoaderCircle className="admin-spin" /> : <LogOut />}
             </button>
@@ -712,26 +943,62 @@ export default function AdminPanel() {
         </aside>
 
         <main className="admin-main">
-          <header className="admin-topbar">
+          <header className="admin-topbar admin-topbar-v3">
             <div>
               <span className="admin-topbar-label">Luka Imagines</span>
               <strong>{activeTitle}</strong>
             </div>
             <div className="admin-topbar-right">
-              <span className="admin-live-status"><i /> დაცული სესია</span>
+              <button type="button" className="admin-palette-trigger" onClick={() => setPaletteOpen(true)} aria-label="სწრაფი მენიუ (Ctrl+K)">
+                <Search aria-hidden="true" />
+                <span>ძიება და მოქმედებები</span>
+                <kbd>Ctrl K</kbd>
+              </button>
               <a className="admin-site-link" href="/" target="_blank" rel="noreferrer">
                 საიტის ნახვა <ArrowUpRight aria-hidden="true" />
               </a>
             </div>
           </header>
 
-          <div className="admin-content">
+          <div className="admin-content admin-content-v3">
             {dashboardError && (
               <div className="admin-alert" role="alert">
                 <CircleAlert aria-hidden="true" />
                 <span>{dashboardError}</span>
                 <button type="button" onClick={() => { void loadDashboard(); }}>ხელახლა ცდა</button>
               </div>
+            )}
+
+            {missingMigrations.length > 0 && (
+              <section className="admin-schema-notice" aria-labelledby="admin-schema-notice-title">
+                <div className="admin-schema-notice-head">
+                  <CircleAlert aria-hidden="true" />
+                  <div>
+                    <h2 id="admin-schema-notice-title">მონაცემთა ბაზას განახლება სჭირდება</h2>
+                    <p>
+                      თქვენი პროექტები და კატეგორიები ჩანს, მაგრამ ქვემოთ ჩამოთვლილი ფუნქციები ჩაირთვება მას შემდეგ, რაც
+                      Supabase-ის SQL რედაქტორში ერთხელ ჩასვამთ და გაუშვებთ (Run) ფაილს <code>supabase/apply-admin-updates.sql</code>.
+                      ის მხოლოდ ამატებს ახალ ცხრილებსა და სვეტებს; არსებულ მონაცემებს არ შლის.
+                    </p>
+                  </div>
+                  {SQL_EDITOR_URL && (
+                    <a className="admin-button admin-button-secondary" href={SQL_EDITOR_URL} target="_blank" rel="noreferrer">
+                      SQL რედაქტორი <ArrowUpRight aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
+                <ol className="admin-schema-notice-list">
+                  {missingMigrations.map((migration) => (
+                    <li key={migration.feature}>
+                      <strong>{migration.label}</strong>
+                      <span>{migration.effect}</span>
+                    </li>
+                  ))}
+                </ol>
+                <button className="admin-button admin-button-secondary" type="button" onClick={() => { void loadDashboard(); }}>
+                  განახლების შემდეგ ხელახლა შემოწმება
+                </button>
+              </section>
             )}
 
             {dashboardLoading ? (
@@ -742,27 +1009,64 @@ export default function AdminPanel() {
             ) : (
               <>
                 {activeSection === 'overview' && (
-                  <section className="admin-page-section" aria-labelledby="admin-overview-heading">
-                    <div className="admin-page-heading">
+                  <section className="admin-page-section admin-dashboard-v3" aria-labelledby="admin-overview-heading">
+                    <div className="admin-page-heading admin-dashboard-heading-v3">
                       <div>
-                        <p className="admin-eyebrow">თქვენი სამუშაო სივრცე</p>
-                        <h1 id="admin-overview-heading">მიმოხილვა</h1>
-                        <p>პორტფოლიოს ძირითადი მონაცემები ერთ სივრცეში.</p>
+                        <h1 id="admin-overview-heading">გამარჯობა</h1>
+                        <p>აირჩიეთ, რისი შეცვლა გსურთ — ან დაამატეთ ახალი ნამუშევარი.</p>
                       </div>
-                      <time className="admin-date" dateTime={new Date().toISOString()}>
-                        {new Intl.DateTimeFormat('ka-GE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
-                      </time>
+                      <div className="admin-page-heading-actions">
+                        <button className="admin-button admin-button-primary" type="button" onClick={() => { setSaveNotice(''); setProjectEditorTarget(null); }}>
+                          <Plus aria-hidden="true" /> ახალი პროექტი
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="admin-stats-grid">
-                      <StatCard label="ყველა პროექტი" value={projects.length} detail="მონაცემთა ბაზაში" Icon={BriefcaseBusiness} tone="green" />
-                      <StatCard label="გამოქვეყნებული" value={publishedCount} detail="საჯაროდ ხილული" Icon={BadgeCheck} tone="copper" />
-                      <StatCard label="მონახაზი" value={draftCount} detail="მხოლოდ ადმინისტრატორისთვის" Icon={FolderOpen} tone="plum" />
-                      <StatCard label="აქტიური კატეგორია" value={activeCategoryCount} detail={`${formatNumber(galleryCount)} გალერეის სურათი`} Icon={Shapes} tone="ink" />
+                    <div className="admin-stats-grid admin-stats-grid-v3 admin-stats-grid-3">
+                      <StatCard label="საიტზე ჩანს" value={publishedCount} detail="ნამუშევარი" Icon={BadgeCheck} tone="green" onClick={() => openProjectsWith('published')} />
+                      <StatCard label="დამალული" value={draftCount} detail="საიტზე არ ჩანს" Icon={FolderOpen} tone="plum" onClick={() => openProjectsWith('draft')} />
+                      <StatCard label="კატეგორია" value={activeCategoryCount} detail="აქტიური კატეგორია" Icon={Shapes} tone="ink" onClick={() => { void goToSection('categories'); }} />
                     </div>
 
-                    <div className="admin-overview-grid">
-                      <section className="admin-surface admin-recent-section">
+                    <section className="admin-attention" aria-labelledby="admin-attention-heading">
+                      <div className="admin-attention-head">
+                        <div>
+                          <p className="admin-eyebrow">სამუშაო სია</p>
+                          <h2 id="admin-attention-heading">{attentionIssues.length ? 'ყურადღებას საჭიროებს' : 'ყველაფერი წესრიგშია'}</h2>
+                        </div>
+                        {attentionIssues.length === 0 && <span className="admin-attention-ok"><CheckCircle2 aria-hidden="true" /> გასასწორებელი არაფერია</span>}
+                      </div>
+                      {attentionIssues.length > 0 && (
+                        <ul className="admin-attention-list">
+                          {attentionIssues.map((issue) => {
+                            const copy = ATTENTION_COPY[issue.id];
+                            return (
+                              <li key={issue.id} className="admin-attention-item">
+                                <strong className="admin-attention-count">{formatNumber(issue.count)}</strong>
+                                <div>
+                                  <h3>{copy.title}</h3>
+                                  <p>{copy.text}</p>
+                                  {issue.samples.length > 0 && <small>მაგ.: {issue.samples.map((sample) => `„${sample}“`).join(', ')}{issue.count > issue.samples.length ? ' …' : ''}</small>}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="admin-button admin-button-quiet"
+                                  onClick={() => {
+                                    if (issue.id === 'empty-category') void goToSection('categories');
+                                    else openProjectsWith(issue.id);
+                                  }}
+                                >
+                                  {copy.action} <ArrowUpRight aria-hidden="true" />
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+
+                    <div className="admin-overview-grid admin-overview-grid-v3">
+                      <section className="admin-surface admin-recent-section admin-dashboard-panel-v3">
                         <div className="admin-section-heading">
                           <div>
                             <p className="admin-eyebrow">ბიბლიოთეკა</p>
@@ -772,67 +1076,76 @@ export default function AdminPanel() {
                             ყველას ნახვა <ArrowUpRight aria-hidden="true" />
                           </button>
                         </div>
-                        {projects.length === 0 ? (
-                          <EmptyState title="პროექტები ჯერ არ არის" message="მონაცემთა ბაზაში პროექტები ჯერ არ გადმოტანილა. არსებული საიტის პორტფოლიო უცვლელად მუშაობს." />
+                        {activeProjects.length === 0 ? (
+                          <EmptyState title="აქტიური პროექტები ჯერ არ არის" message="აქტიურ ბიბლიოთეკაში პროექტები არ მოიძებნა. წაშლილი ნამუშევრები „წაშლილში“ ინახება." />
                         ) : (
                           <div className="admin-recent-list">
-                            {[...projects].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5).map((project) => (
-                              <div className="admin-recent-row" key={project.id}>
-                                <span className="admin-project-thumb"><BriefcaseBusiness aria-hidden="true" /></span>
-                                <div className="admin-recent-copy">
-                                  <strong>{project.title}</strong>
-                                  <span>{categoryLabelForId(project.category_id)}</span>
-                                </div>
-                                <span className={`admin-state-pill ${project.is_published ? 'is-published' : 'is-draft'}`}>
-                                  {project.is_published ? 'გამოქვეყნებული' : 'მონახაზი'}
+                            {[...activeProjects].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5).map((project) => (
+                              <button type="button" className="admin-recent-row admin-recent-row-v3" key={project.id} onClick={() => { setSaveNotice(''); setProjectEditorTarget(project); }}>
+                                <span className="admin-project-thumb admin-project-thumb-v3">
+                                  <BriefcaseBusiness aria-hidden="true" />
+                                  {coverPreviewByProject[project.id] && <img src={coverPreviewByProject[project.id]} alt="" loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} />}
                                 </span>
-                              </div>
+                                <span className="admin-recent-copy">
+                                  <strong>{project.title}</strong>
+                                  <span>{categoryLabelForId(project.category_id)} · {formatDate(project.created_at)}</span>
+                                </span>
+                                <span className={`admin-state-pill ${project.is_published ? 'is-published' : 'is-draft'}`}>
+                                  {project.is_published ? 'ჩანს' : 'დამალულია'}
+                                </span>
+                              </button>
                             ))}
                           </div>
                         )}
                       </section>
 
-                      <section className="admin-surface admin-category-summary">
+                      <section className="admin-surface admin-dashboard-panel-v3 admin-where-panel" aria-labelledby="admin-where-heading">
                         <div className="admin-section-heading">
                           <div>
-                            <p className="admin-eyebrow">სტრუქტურა</p>
-                            <h2>კატეგორიები</h2>
+                            <p className="admin-eyebrow">საიტის შეცვლა</p>
+                            <h2 id="admin-where-heading">სად რა იცვლება</h2>
                           </div>
-                          <button className="admin-icon-button" type="button" aria-label="კატეგორიების ნახვა" onClick={() => setActiveSection('categories')}>
-                            <ArrowUpRight aria-hidden="true" />
-                          </button>
                         </div>
-                        {projectsByCategory.length === 0 ? (
-                          <EmptyState title="კატეგორიები არ მოიძებნა" message="კატეგორიების სია ხელმისაწვდომი გახდება მონაცემების ჩატვირთვის შემდეგ." />
-                        ) : (
-                          <div className="admin-category-list">
-                            {projectsByCategory.map((category) => (
-                              <div className="admin-category-summary-row" key={category.id}>
-                                <span><i className={category.is_active ? 'is-active' : ''} />{getCategoryAdminLabel(category)}</span>
-                                <strong>{formatNumber(category.projectCount)}</strong>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <ul className="admin-where-list">
+                          {WHERE_LINKS.map((link) => (
+                            <li key={link.id}>
+                              <button type="button" onClick={() => { void goToSection(link.id); }}>
+                                <link.Icon aria-hidden="true" />
+                                <span><strong>{link.label}</strong><small>{link.text}</small></span>
+                                <ArrowUpRight aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       </section>
                     </div>
                   </section>
                 )}
 
                 {activeSection === 'projects' && (
-                  <section className="admin-page-section" aria-labelledby="admin-projects-heading">
+                  <WorksManager
+                    projects={activeProjects}
+                    categories={categories}
+                    covers={coverPreviewByProject}
+                    trashCount={trashedProjects.length}
+                    onOpenTrash={() => { void goToSection('trash'); }}
+                    onReload={() => loadDashboard({ silent: true })}
+                    onTrash={(project) => { void runProjectAction(project, 'trash'); }}
+                    onOpenDetails={(project) => { setSaveNotice(''); setProjectEditorTarget(project); }}
+                  />
+                )}
+
+                {activeSection === 'trash' && (
+                  <section className="admin-page-section" aria-labelledby="admin-trash-heading">
                     <div className="admin-page-heading">
                       <div>
-                        <p className="admin-eyebrow">პორტფოლიოს ბიბლიოთეკა</p>
-                        <h1 id="admin-projects-heading">პროექტები</h1>
-                        <p>მართეთ პროექტების აღწერა, კატეგორია, სურათები და გამოქვეყნება.</p>
-                      </div>
-                      <div className="admin-project-heading-actions">
-                        <span className="admin-count-chip">{formatNumber(projects.length)} პროექტი</span>
-                        <button className="admin-button admin-button-primary" type="button" onClick={() => { setSaveNotice(''); setProjectEditorTarget(null); }}>
-                          <Plus aria-hidden="true" /> პროექტის დამატება
+                        <button type="button" className="admin-back-link" onClick={() => { void goToSection('projects'); }}>
+                          <ArrowLeft aria-hidden="true" /> პროექტებზე დაბრუნება
                         </button>
+                        <h1 id="admin-trash-heading">წაშლილი</h1>
+                        <p>აქ არის წაშლილი ნამუშევრები. ნებისმიერი შეგიძლიათ აღადგინოთ.</p>
                       </div>
+                      <span className="admin-count-chip">{formatNumber(trashedProjects.length)} პროექტი</span>
                     </div>
                     {saveNotice && (
                       <div className="admin-success-notice" role="status">
@@ -841,44 +1154,43 @@ export default function AdminPanel() {
                         <button type="button" aria-label="შეტყობინების დახურვა" onClick={() => setSaveNotice('')}><X aria-hidden="true" /></button>
                       </div>
                     )}
+                    <div className="admin-trash-warning" role="note">
+                      <CircleAlert aria-hidden="true" />
+                      <p>სამუდამო წაშლა ცალკე, ორჯერ დადასტურებას მოითხოვს. მონაცემთა ბაზის ჩანაწერები წაიშლება, სურათების საცავის ფაილები კი უცვლელი დარჩება.</p>
+                    </div>
                     <div className="admin-surface admin-table-surface">
                       <div className="admin-list-toolbar">
                         <label className="admin-search-wrap">
                           <Search aria-hidden="true" />
-                          <input value={projectSearch} onChange={(event) => setProjectSearch(event.target.value)} placeholder="პროექტის ძიება" aria-label="პროექტის ძიება" />
+                          <input value={trashSearch} onChange={(event) => setTrashSearch(event.target.value)} placeholder="ძიება" aria-label="წაშლილებში ძიება" />
                         </label>
-                        <span>{formatNumber(filteredProjects.length)} შედეგი</span>
+                        <span>{formatNumber(filteredTrash.length)} შედეგი</span>
                       </div>
-                      {filteredProjects.length === 0 ? (
-                        <EmptyState title={projects.length ? 'შედეგი ვერ მოიძებნა' : 'პროექტები ჯერ არ არის'} message={projects.length ? 'სცადეთ სხვა სათაურით ძიება.' : 'მონაცემთა ბაზაში ჯერ პროექტი არ არის. დაამატეთ ახალი პროექტი; არსებული საიტის პორტფოლიო უცვლელი დარჩება.'} />
+                      {filteredTrash.length === 0 ? (
+                        <EmptyState title={trashedProjects.length ? 'შედეგი ვერ მოიძებნა' : 'წაშლილი არაფერია'} message={trashedProjects.length ? 'სცადეთ სხვა სათაურით ძიება.' : 'წაშლილი ნამუშევრები აქ გამოჩნდება.'} />
                       ) : (
-                        <div className="admin-project-list">
-                          {filteredProjects.map((project) => {
-                            const category = categories.find((item) => item.id === project.category_id);
-                            return (
-                              <article className="admin-project-row" key={project.id}>
-                                <div className="admin-project-thumb">
-                                  {project.cover_image_path ? <ImageIcon aria-hidden="true" /> : <BriefcaseBusiness aria-hidden="true" />}
-                                </div>
-                                <div className="admin-project-main">
-                                  <strong>{project.title}</strong>
-                                  <span>{category ? getCategoryAdminLabel(category) : 'კატეგორია არ არის მითითებული'} <i /> {project.slug}</span>
-                                </div>
-                                <span className={`admin-state-pill ${project.is_published ? 'is-published' : 'is-draft'}`}>
-                                  {project.is_published ? 'გამოქვეყნებული' : 'მონახაზი'}
-                                </span>
-                                {project.is_featured && <span className="admin-featured-label">რჩეული</span>}
-                                <time dateTime={project.created_at}>{formatDate(project.created_at)}</time>
-                                <button
-                                  className="admin-icon-button admin-project-edit-button"
-                                  type="button"
-                                  aria-label={`პროექტის რედაქტირება: ${project.title}`}
-                                  title="პროექტის რედაქტირება"
-                                  onClick={() => { setSaveNotice(''); setProjectEditorTarget(project); }}
-                                ><Pencil aria-hidden="true" /></button>
-                              </article>
-                            );
-                          })}
+                        <div className="admin-project-list admin-project-grid-v3 admin-trash-grid-v3">
+                          {filteredTrash.map((project) => (
+                            <article className="admin-project-row admin-trash-row admin-project-card-v3" key={project.id}>
+                              <span className="admin-project-thumb admin-project-card-cover-v3">{project.cover_image_path ? <ImageIcon aria-hidden="true" /> : <BriefcaseBusiness aria-hidden="true" />}</span>
+                              <div className="admin-project-main">
+                                <strong>{project.title}</strong>
+                                <span>{categoryLabelForId(project.category_id)} <i /> {project.slug}</span>
+                              </div>
+                              <span className={`admin-state-pill ${project.is_published ? 'is-published' : 'is-draft'}`}>
+                                {project.is_published ? 'აღდგენისას გამოჩნდება' : 'დამალულია'}
+                              </span>
+                              <time dateTime={project.deleted_at ?? undefined}>{project.deleted_at ? `წაიშალა: ${formatDate(project.deleted_at)}` : ''}</time>
+                              <div className="admin-project-row-actions">
+                                <button className="admin-icon-button" type="button" aria-label={`პროექტის აღდგენა: ${project.title}`} title="აღდგენა" disabled={Boolean(projectActionId)} onClick={() => { void runProjectAction(project, 'restore'); }}>
+                                  {projectActionId === project.id ? <LoaderCircle className="admin-spin" aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
+                                </button>
+                                <button className="admin-icon-button admin-project-trash-button" type="button" aria-label={`სამუდამოდ წაშლა: ${project.title}`} title="სამუდამოდ წაშლა" disabled={Boolean(projectActionId)} onClick={() => { void runProjectAction(project, 'delete'); }}>
+                                  <Trash2 aria-hidden="true" />
+                                </button>
+                              </div>
+                            </article>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -886,167 +1198,66 @@ export default function AdminPanel() {
                 )}
 
                 {activeSection === 'categories' && (
-                  <section className="admin-page-section" aria-labelledby="admin-categories-heading">
-                    <div className="admin-page-heading">
-                      <div>
-                        <p className="admin-eyebrow">პორტფოლიოს სტრუქტურა</p>
-                        <h1 id="admin-categories-heading">კატეგორიები</h1>
-                        <p>კატეგორიები პანელში ქართულად ჩანს; მონაცემთა ბაზის სახელები და იდენტიფიკატორები უცვლელია.</p>
-                      </div>
-                      <div className="admin-project-heading-actions">
-                        <span className="admin-count-chip">{formatNumber(categories.length)} კატეგორია</span>
-                        <button className="admin-button admin-button-primary" type="button" onClick={() => { setCategoryNotice(''); setCategoryEditorTarget(null); }}>
-                          <Plus aria-hidden="true" /> კატეგორიის დამატება
-                        </button>
-                      </div>
-                    </div>
-                    {categoryNotice && (
-                      <div className="admin-success-notice" role="status">
-                        <CheckCircle2 aria-hidden="true" />
-                        <span>{categoryNotice}</span>
-                        <button type="button" aria-label="შეტყობინების დახურვა" onClick={() => setCategoryNotice('')}><X aria-hidden="true" /></button>
-                      </div>
-                    )}
-                    <div className="admin-surface admin-category-table">
-                      {categories.length === 0 ? (
-                        <EmptyState title="კატეგორიები არ არის" message="ბაზაში კატეგორიების ჩანაწერები ჯერ არ მოიძებნა." />
-                      ) : projectsByCategory.map((category, index) => (
-                        <article className="admin-category-row" key={category.id}>
-                          <span className="admin-order-number">{formatNumber(index + 1).padStart(2, '0')}</span>
-                          <div className="admin-category-row-copy">
-                            <strong>{getCategoryAdminLabel(category)}</strong>
-                            <span>{category.slug}</span>
-                            {category.description && <p>{category.description}</p>}
-                          </div>
-                          <span className={`admin-state-pill ${category.is_active ? 'is-published' : 'is-draft'}`}>
-                            {category.is_active ? 'აქტიური' : 'არააქტიური'}
-                          </span>
-                          <span className="admin-category-project-count">{formatNumber(category.projectCount)} პროექტი</span>
-                          <button
-                            className="admin-icon-button admin-category-edit-button"
-                            type="button"
-                            aria-label={`კატეგორიის რედაქტირება: ${getCategoryAdminLabel(category)}`}
-                            title="კატეგორიის რედაქტირება"
-                            onClick={() => { setCategoryNotice(''); setCategoryEditorTarget(category); }}
-                          ><Pencil aria-hidden="true" /></button>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
+                  <CategoriesView
+                    categories={categories}
+                    projects={projects}
+                    covers={coverPreviewByProject}
+                    onReload={() => loadDashboard({ silent: true })}
+                    onEdit={(category) => { setCategoryNotice(''); setCategoryEditorTarget(category); }}
+                  />
                 )}
 
-                {activeSection === 'media' && (
-                  <section className="admin-page-section" aria-labelledby="admin-media-heading">
-                    <div className="admin-page-heading">
-                      <div>
-                        <p className="admin-eyebrow">პირადი საცავი</p>
-                        <h1 id="admin-media-heading">მედია</h1>
-                        <p>პროექტებთან დაკავშირებული სურათების ნახვა უსაფრთხო, დროებითი ბმულებით.</p>
-                      </div>
-                      <span className="admin-count-chip">{formatNumber(media.length)} ფაილი</span>
-                    </div>
-                    {sectionError && <div className="admin-alert" role="alert"><CircleAlert aria-hidden="true" />{sectionError}</div>}
-                    {mediaLoading ? (
-                      <div className="admin-loading-state" role="status"><LoaderCircle className="admin-spin" aria-hidden="true" />მედია იტვირთება...</div>
-                    ) : media.length === 0 ? (
-                      <div className="admin-surface"><EmptyState title="მედია ჯერ არ არის მიბმული" message="სურათები გამოჩნდება, როცა მონაცემთა ბაზაში პროექტებსა და გალერეის ჩანაწერებს დაამატებთ. ამ ეტაპზე ატვირთვისა და წაშლის მოქმედებები გამორთულია." /></div>
-                    ) : (
-                      <div className="admin-media-grid">
-                        {media.map((asset) => (
-                          <article className="admin-media-item" key={asset.id}>
-                            <div className="admin-media-preview">
-                              <img src={asset.signedUrl} alt={asset.altText || asset.projectTitle} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} />
-                              <span className="admin-media-kind">{asset.kind === 'cover' ? 'ქავერი' : 'გალერეა'}</span>
-                            </div>
-                            <div className="admin-media-copy">
-                              <strong>{asset.projectTitle}</strong>
-                              <span title={asset.path}>{asset.path.split('/').at(-1)}</span>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                {activeSection === 'calculator' && (
+                  <CalculatorManagement onDirtyChange={setCalculatorDirty} />
+                )}
+
+                {activeSection === 'website-sections' && (
+                  <WebsiteSectionsErrorBoundary>
+                    <WebsiteSectionsManager onDirtyChange={setWebsiteSectionsDirty} />
+                  </WebsiteSectionsErrorBoundary>
                 )}
 
                 {activeSection === 'settings' && (
                   <section className="admin-page-section" aria-labelledby="admin-settings-heading">
                     <div className="admin-page-heading">
                       <div>
-                        <p className="admin-eyebrow">პირადი კონფიგურაცია</p>
-                        <h1 id="admin-settings-heading">საიტის პარამეტრები</h1>
-                        <p>პარამეტრები ადმინისტრატორისთვის არის განკუთვნილი და ამ ეტაპზე მხოლოდ იკითხება.</p>
+                        <h1 id="admin-settings-heading">კონტაქტი და სტატუსი</h1>
+                        <p>იღებთ თუ არა ახალ პროექტებს, სად ხართ და როგორ დაგიკავშირდნენ. შენახვისთანავე ჩანს საიტზე.</p>
                       </div>
-                      <span className="admin-readonly-badge"><LockKeyhole aria-hidden="true" /> მხოლოდ ნახვა</span>
                     </div>
-                    {sectionError && <div className="admin-alert" role="alert"><CircleAlert aria-hidden="true" />{sectionError}</div>}
-                    {settingsLoading ? (
-                      <div className="admin-loading-state" role="status"><LoaderCircle className="admin-spin" aria-hidden="true" />პარამეტრები იტვირთება...</div>
-                    ) : settings.length === 0 && siteContent.length === 0 ? (
-                      <div className="admin-surface"><EmptyState title="კონტენტი ჯერ არ არის" message="საიტის ტექსტი და პირადი პარამეტრები გამოჩნდება შესაბამისი ჩანაწერების დამატების შემდეგ. ამ ეტაპზე ისინი მხოლოდ წაკითხვადია." /></div>
-                    ) : (
-                      <div className="admin-surface admin-setting-list">
-                        {siteContent.length > 0 && (
-                          <section className="admin-settings-group">
-                            <div className="admin-settings-group-heading">
-                              <h2>საიტის ტექსტი და ინფორმაცია</h2>
-                              <span>საჯარო კონტენტი</span>
-                            </div>
-                            {siteContent.map((item) => (
-                              <article className="admin-setting-row" key={item.id}>
-                                <div>
-                                  <strong>{item.content_key}</strong>
-                                  <span className="admin-setting-meta">{item.locale} · {item.is_published ? 'გამოქვეყნებული' : 'მონახაზი'}</span>
-                                  <time dateTime={item.updated_at}>განახლდა {formatDate(item.updated_at)}</time>
-                                </div>
-                                <pre>{JSON.stringify(item.content, null, 2)}</pre>
-                              </article>
-                            ))}
-                          </section>
-                        )}
-                        {settings.length > 0 && (
-                          <section className="admin-settings-group">
-                            <div className="admin-settings-group-heading">
-                              <h2>პირადი პარამეტრები</h2>
-                              <span>მხოლოდ ადმინისტრატორისთვის</span>
-                            </div>
-                            {settings.map((setting) => (
-                              <article className="admin-setting-row" key={setting.setting_key}>
-                                <div>
-                                  <strong>{setting.setting_key}</strong>
-                                  <time dateTime={setting.updated_at}>განახლდა {formatDate(setting.updated_at)}</time>
-                                </div>
-                                <pre>{JSON.stringify(setting.setting_value, null, 2)}</pre>
-                              </article>
-                            ))}
-                          </section>
-                        )}
-                      </div>
-                    )}
+                    <SiteSettingsView onDirtyChange={setSettingsDirty} />
                   </section>
                 )}
               </>
             )}
           </div>
 
-          <footer className="admin-footer">
-            <span>Luka Imagines</span>
-            <span>დაცული მართვის სივრცე</span>
-          </footer>
         </main>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        sections={navigation}
+        projects={activeProjects.map((project) => ({ id: project.id, title: project.title }))}
+        onNavigate={(id) => { void goToSection(id as AdminSection); }}
+        onNewProject={() => { setSaveNotice(''); setProjectEditorTarget(null); }}
+        onOpenProject={(id) => {
+          const project = activeProjects.find((item) => item.id === id);
+          if (project) { setSaveNotice(''); setProjectEditorTarget(project); }
+        }}
+      />
+      <AdminFeedbackHost />
       {projectEditorTarget !== undefined && (
         <ProjectEditor
           project={projectEditorTarget}
           categories={categories}
           onClose={() => setProjectEditorTarget(undefined)}
-          onDraftCreated={() => { void loadDashboard(); }}
+          onDraftCreated={() => { void loadDashboard({ silent: true }); }}
           onSaved={(message) => {
             setProjectEditorTarget(undefined);
             setSaveNotice(message);
-            setMediaLoaded(false);
-            setMedia([]);
-            void loadDashboard();
+            adminToast(message, 'success');
+            void loadDashboard({ silent: true });
           }}
         />
       )}
@@ -1056,8 +1267,20 @@ export default function AdminPanel() {
           onClose={() => setCategoryEditorTarget(undefined)}
           onSaved={(message) => {
             setCategoryEditorTarget(undefined);
-            setCategoryNotice(message);
-            void loadDashboard();
+            adminToast(message, 'success');
+            void loadDashboard({ silent: true });
+          }}
+        />
+      )}
+      {organizerOpen && (
+        <PortfolioOrganizer
+          categories={categories}
+          projects={projects}
+          onClose={() => setOrganizerOpen(false)}
+          onEdit={(project) => { setProjectEditorTarget(project); }}
+          onSaved={(message) => {
+            setSaveNotice(message);
+            void loadDashboard({ silent: true });
           }}
         />
       )}

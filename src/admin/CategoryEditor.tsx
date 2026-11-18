@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { CircleAlert, LoaderCircle, Save, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { adminConfirm } from './feedback';
+import { slugifyCategoryName } from './labels';
 
 export type AdminCategory = {
   id: string;
@@ -19,8 +21,11 @@ type CategoryEditorProps = {
 };
 
 export default function CategoryEditor({ category, onClose, onSaved }: CategoryEditorProps) {
+  // New categories get their URL code from the name until the user edits the code themselves.
   const [slug, setSlug] = useState(category?.slug ?? '');
+  const [slugTouched, setSlugTouched] = useState(Boolean(category));
   const [name, setName] = useState(category?.name ?? '');
+  const effectiveSlug = slugTouched ? slug : slugifyCategoryName(name);
   const [description, setDescription] = useState(category?.description ?? '');
   const [displayOrder, setDisplayOrder] = useState(category?.display_order ?? 0);
   const [isActive, setIsActive] = useState(category?.is_active ?? true);
@@ -32,20 +37,21 @@ export default function CategoryEditor({ category, onClose, onSaved }: CategoryE
     const client = supabase;
     if (!client || isSaving) return;
 
-    const normalizedSlug = slug.trim().toLowerCase().replace(/\s+/g, '-');
+    const normalizedSlug = effectiveSlug.trim().toLowerCase().replace(/\s+/g, '-');
     const normalizedName = name.trim();
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
-      setErrorMessage('კოდი გამოიყენებს მხოლოდ ლათინურ პატარა ასოებს, ციფრებსა და დეფისს.');
-      return;
-    }
     if (!normalizedName) {
       setErrorMessage('შეავსეთ კატეგორიის სახელი.');
       return;
     }
-    if (category?.is_active && !isActive && category.projectCount > 0) {
-      const confirmed = window.confirm('კატეგორია საჯარო სიიდან დაიმალება. პროექტები და სურათები არ წაიშლება. გსურთ გაგრძელება?');
-      if (!confirmed) return;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+      setErrorMessage('ბმულის კოდი ვერ შეიქმნა სახელიდან. „დამატებითში“ მიუთითეთ ლათინური ასოებით, მაგ. packaging.');
+      return;
     }
+    if (category?.is_active && !isActive && category.projectCount > 0 && !await adminConfirm({
+      title: 'კატეგორიის დამალვა',
+      message: 'კატეგორია და მისი პროექტები საიტზე აღარ გამოჩნდება. არაფერი წაიშლება.',
+      confirmLabel: 'დამალვა',
+    })) return;
 
     setIsSaving(true);
     setErrorMessage('');
@@ -76,8 +82,7 @@ export default function CategoryEditor({ category, onClose, onSaved }: CategoryE
       <section className="admin-editor-dialog admin-category-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-category-editor-title" lang="ka-GE">
         <header className="admin-editor-header">
           <div>
-            <p className="admin-eyebrow">პორტფოლიოს სტრუქტურა</p>
-            <h2 id="admin-category-editor-title">{category ? 'კატეგორიის რედაქტირება' : 'კატეგორიის დამატება'}</h2>
+            <h2 id="admin-category-editor-title">{category ? 'კატეგორიის შეცვლა' : 'ახალი კატეგორია'}</h2>
           </div>
           <button className="admin-icon-button" type="button" aria-label="რედაქტორის დახურვა" onClick={onClose} disabled={isSaving}><X aria-hidden="true" /></button>
         </header>
@@ -85,31 +90,38 @@ export default function CategoryEditor({ category, onClose, onSaved }: CategoryE
         <form className="admin-category-editor-form" onSubmit={handleSubmit}>
           {errorMessage && <div className="admin-alert" role="alert"><CircleAlert aria-hidden="true" /><span>{errorMessage}</span></div>}
           <label className="admin-editor-field">
-            <span>კატეგორიის სახელი <i>*</i></span>
+            <span>სახელი <i>*</i></span>
             <input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required placeholder="მაგალითად, შეფუთვის დიზაინი" />
           </label>
           <label className="admin-editor-field">
-            <span>აღწერა</span>
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} rows={3} placeholder="მოკლე აღწერა კატალოგისთვის" />
-          </label>
-          <label className="admin-editor-field">
-            <span>მისამართის კოდი <i>*</i></span>
-            <input value={slug} onChange={(event) => setSlug(event.target.value)} maxLength={80} required disabled={Boolean(category)} placeholder="მაგ. packaging-design" />
-            <small>{category ? 'არსებული კოდი და იდენტიფიკატორი უცვლელი დარჩება.' : 'ლათინური პატარა ასოები, ციფრები და დეფისი; შემდეგ კოდი აღარ შეიცვლება.'}</small>
-          </label>
-          <label className="admin-editor-field admin-category-editor-order">
-            <span>ჩვენების რიგი</span>
-            <input type="number" min="0" step="1" inputMode="numeric" value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} />
+            <span>აღწერა <em>არასავალდებულო</em></span>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} rows={3} placeholder="ერთი წინადადება კატალოგის გვერდისთვის" />
           </label>
           <label className="admin-editor-toggle">
             <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
             <span className="admin-editor-toggle-mark" />
-            <span><strong>აქტიური კატეგორია</strong><small>აქტიური კატეგორია საჯარო კატალოგში გამოჩნდება.</small></span>
+            <span><strong>{isActive ? 'საიტზე ჩანს' : 'დამალულია'}</strong><small>{isActive ? 'კატეგორია და მისი პროექტები კატალოგში ჩანს.' : 'კატეგორია და მისი პროექტები საიტზე არ ჩანს.'}</small></span>
           </label>
-          <div className="admin-editor-policy-note">
-            <CircleAlert aria-hidden="true" />
-            <p>კატეგორიის წაშლა გამორთულია. მისი გამორთვა პროექტებსა და სურათებს არ შლის.</p>
-          </div>
+          <details className="admin-editor-more">
+            <summary>დამატებითი <small>ბმული და რიგი</small></summary>
+            <div className="admin-editor-more-body">
+              <label className="admin-editor-field">
+                <span>ბმულის კოდი</span>
+                <input
+                  value={effectiveSlug}
+                  onChange={(event) => { setSlugTouched(true); setSlug(event.target.value); }}
+                  maxLength={80}
+                  disabled={Boolean(category)}
+                  placeholder="packaging-design"
+                />
+                <small>{category ? 'არსებული კატეგორიის ბმული არ იცვლება.' : `კატალოგის მისამართი: /portfolio/${effectiveSlug || '…'}`}</small>
+              </label>
+              <label className="admin-editor-field">
+                <span>რიგი</span>
+                <input type="number" min="0" step="1" inputMode="numeric" value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} />
+              </label>
+            </div>
+          </details>
           <footer className="admin-editor-footer">
             <button className="admin-button admin-button-quiet" type="button" onClick={onClose} disabled={isSaving}>გაუქმება</button>
             <button className="admin-button admin-button-primary" type="submit" disabled={isSaving}>

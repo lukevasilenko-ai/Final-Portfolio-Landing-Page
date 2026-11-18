@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
+    "dev:staging": "node server.js --staging",
     "start": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
+    "test:calculator": "tsx --test tests/calculator.test.ts",
+    "test:website-sections": "tsx --test tests/website-sections.test.ts",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },

@@ -38,6 +38,7 @@ export interface PortfolioCategory {
 
 export interface PortfolioItem {
   id: string;
+  databaseProjectId?: string;
   title: string;
   category: PortfolioItemCategory;
   kind?: PortfolioItemKind;

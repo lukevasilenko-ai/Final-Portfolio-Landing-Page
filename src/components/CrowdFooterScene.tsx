@@ -6,6 +6,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { AnimatePresence, motion } from 'motion/react';
+import { websiteCopy, type WebsiteCopy } from '../websiteSections/copy';
+import { NativeElementSlot } from '../websiteSections/NativeElements';
+import { EditableText } from '../websiteSections/EditableText';
 
 interface HighlightHoverState {
   active: boolean;
@@ -431,7 +434,7 @@ export function CrowdCanvas({
   return <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full" />;
 }
 
-export default function CrowdFooterScene() {
+export default function CrowdFooterScene({ content }: { content?: WebsiteCopy }) {
   const [thoughtBubble, setThoughtBubble] = useState({
     active: false,
     x: 0,
@@ -451,14 +454,15 @@ export default function CrowdFooterScene() {
 
   return (
     <section
+      id="closing-scene"
       aria-label="მოძრავი ილუსტრაციების სცენა"
-      className="content-layer section-rule relative isolate h-[560px] overflow-hidden bg-[var(--brand-accent-faint)] sm:h-[620px] lg:h-[650px]"
+      className="content-layer relative isolate border-t border-[var(--brand-line)] h-[560px] overflow-hidden bg-[var(--brand-accent-faint)] sm:h-[620px] lg:h-[650px]"
     >
-      <div className="container-xl relative z-10 flex justify-center px-5 pt-16 text-center sm:px-8">
-        <h2 className="text-[48px] font-extrabold leading-[1.08] text-[var(--brand-ink)] sm:text-[56px]">
-          <span>იყავი </span>
-          <span className="font-elene-akhvlediani inline-block text-[var(--brand-accent)]">გამორჩეული</span>
-        </h2>
+      <div className="container-xl relative z-10 flex justify-center px-5 pt-20 text-center sm:px-8">
+        <NativeElementSlot id="closing-scene.title"><h2 className="ed-display text-[44px] leading-[1.1] text-[var(--brand-ink)] sm:text-[64px] lg:text-[80px]">
+          <span><EditableText field="titleLine1">{websiteCopy(content, 'titleLine1', 'იყავი ')}</EditableText></span>
+          <span className="font-elene-akhvlediani inline-block text-[var(--brand-accent)]"><EditableText field="titleAccent">{websiteCopy(content, 'titleAccent', 'გამორჩეული')}</EditableText></span>
+        </h2></NativeElementSlot>
       </div>
       <div className="absolute inset-x-0 bottom-0 top-48 overflow-hidden sm:top-36">
         <CrowdCanvas

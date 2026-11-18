@@ -4,26 +4,30 @@
  */
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { websiteCopy, type WebsiteCopy } from '../websiteSections/copy';
+import { NativeElementSlot } from '../websiteSections/NativeElements';
+import { EditableText } from '../websiteSections/EditableText';
 
 const CrowdFooterScene = lazy(() => import('./CrowdFooterScene'));
 
-function FooterScenePlaceholder() {
+function FooterScenePlaceholder({ content }: { content?: WebsiteCopy }) {
   return (
     <section
+      id="closing-scene"
       aria-label="ფინალური ვიზუალური სცენა იტვირთება"
-      className="content-layer section-rule relative isolate h-[560px] overflow-hidden bg-[var(--brand-accent-faint)] sm:h-[620px] lg:h-[650px]"
+      className="content-layer relative isolate border-t border-[var(--brand-line)] h-[560px] overflow-hidden bg-[var(--brand-accent-faint)] sm:h-[620px] lg:h-[650px]"
     >
-      <div className="container-xl flex justify-center px-5 pt-16 text-center sm:px-8">
-        <h2 className="text-[48px] font-extrabold leading-[1.08] text-[var(--brand-ink)] sm:text-[56px]">
-          <span>იყავი </span>
-          <span className="font-elene-akhvlediani inline-block text-[var(--brand-accent)]">გამორჩეული</span>
-        </h2>
+      <div className="container-xl flex justify-center px-5 pt-20 text-center sm:px-8">
+        <NativeElementSlot id="closing-scene.title"><h2 className="ed-display text-[44px] leading-[1.1] text-[var(--brand-ink)] sm:text-[64px] lg:text-[80px]">
+          <span><EditableText field="titleLine1">{websiteCopy(content, 'titleLine1', 'იყავი ')}</EditableText></span>
+          <span className="font-elene-akhvlediani inline-block text-[var(--brand-accent)]"><EditableText field="titleAccent">{websiteCopy(content, 'titleAccent', 'გამორჩეული')}</EditableText></span>
+        </h2></NativeElementSlot>
       </div>
     </section>
   );
 }
 
-export default function LazyCrowdFooterScene() {
+export default function LazyCrowdFooterScene({ content }: { content?: WebsiteCopy }) {
   const triggerRef = useRef<HTMLDivElement>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
 
@@ -52,11 +56,11 @@ export default function LazyCrowdFooterScene() {
   return (
     <div ref={triggerRef}>
       {shouldLoad ? (
-        <Suspense fallback={<FooterScenePlaceholder />}>
-          <CrowdFooterScene />
+        <Suspense fallback={<FooterScenePlaceholder content={content} />}>
+          <NativeElementSlot id="closing-scene.animation"><CrowdFooterScene content={content} /></NativeElementSlot>
         </Suspense>
       ) : (
-        <FooterScenePlaceholder />
+        <FooterScenePlaceholder content={content} />
       )}
     </div>
   );

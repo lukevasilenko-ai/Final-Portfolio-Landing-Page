@@ -21,6 +21,7 @@ type ProjectRow = {
   cover_image_path: string | null;
   display_order: number;
   is_published: boolean;
+  deleted_at: string | null;
   is_featured: boolean;
   tags: string[];
   tools: string[];
@@ -101,7 +102,8 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
   }
 
   const projectQuery = client.from('portfolio_projects')
-    .select('id, source_key, slug, title, description, category_id, presentation_type, cover_image_path, display_order, is_published, is_featured, tags, tools, year, published_date, client, service_type, industry, author, location, created_at');
+    .select('id, source_key, slug, title, description, category_id, presentation_type, cover_image_path, display_order, is_published, is_featured, deleted_at, tags, tools, year, published_date, client, service_type, industry, author, location, created_at')
+    .is('deleted_at', null);
   if (includeDraftsInLocalPreview) projectQuery.or('is_published.eq.true,source_key.not.is.null');
   else projectQuery.eq('is_published', true);
   const [categoryResult, projectResult, galleryResult] = await Promise.all([
@@ -203,6 +205,7 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
 
     const item: PortfolioItem = {
       id: row.source_key || row.id,
+      databaseProjectId: row.id,
       title: row.title,
       category: categoryId,
       categoryLabel: category.name,

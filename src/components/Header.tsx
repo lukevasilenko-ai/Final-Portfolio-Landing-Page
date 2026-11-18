@@ -8,9 +8,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, ArrowUpRight, Moon, Sun } from 'lucide-react';
 import { BRAND_MARK } from '../data';
 import { navigateWithinSite } from '../navigation';
+import { useSiteProfile } from '../SiteProfileContext';
+import { EditableLabel, useEditable } from '../websiteSections/EditableText';
+import { followSiteLink, isExternalLink } from '../navigation';
 
 interface HeaderProps {
   activeSection: string;
+  navItems?: Array<{ label: string; href: string }>;
+  homeHref?: string;
+  contactHref?: string;
 }
 
 type ThemeMode = 'light' | 'dark';
@@ -60,10 +66,39 @@ function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
   );
 }
 
-export default function Header({ activeSection }: HeaderProps) {
+const DEFAULT_NAV_ITEMS = [
+  { label: 'მთავარი', href: '#home' },
+  { label: 'პროექტები', href: '#projects' },
+  { label: 'კალკულატორი', href: '#calculator' },
+  { label: 'კონტაქტი', href: '#contact' },
+];
+
+function BrandLink({ href, onClick }: { href: string; onClick: (e: React.MouseEvent<HTMLAnchorElement>) => void }) {
+  return (
+    <a href={href} onClick={onClick} className="flex shrink-0 items-center gap-3 text-[var(--brand-ink)]">
+      <span className="flex h-7 w-7 items-center justify-center overflow-hidden">
+        <span
+          className="brand-mark-glyph"
+          style={{ WebkitMaskImage: `url("${BRAND_MARK}")`, maskImage: `url("${BRAND_MARK}")` }}
+          role="img"
+          aria-label="Luka Imagines"
+        />
+      </span>
+      <span className="flex flex-col leading-none">
+        <span className="text-[15px] font-bold"><EditableLabel id="header.brand-name" fallback="Luka Imagines" /></span>
+        <span className="mt-1.5 text-[11px] text-[var(--brand-muted)]"><EditableLabel id="header.brand-role" fallback="გრაფიკული დიზაინერი" /></span>
+      </span>
+    </a>
+  );
+}
+
+export default function Header({ activeSection, navItems, homeHref, contactHref }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const profile = useSiteProfile();
+  const headerCta = useEditable('header.cta', 'button', '„დამიკავშირდით“ ღილაკი', ['hide', 'href']);
+  const themeToggle = useEditable('header.theme', 'item', 'თემის ღილაკი');
 
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -77,7 +112,7 @@ export default function Header({ activeSection }: HeaderProps) {
       themeColor.name = 'theme-color';
       document.head.appendChild(themeColor);
     }
-    themeColor.content = theme === 'dark' ? '#0b0e0c' : '#f4f6f2';
+    themeColor.content = theme === 'dark' ? '#121110' : '#f2efe9';
   }, [theme]);
 
   useEffect(() => {
@@ -107,13 +142,11 @@ export default function Header({ activeSection }: HeaderProps) {
     };
   }, [isMobileMenuOpen]);
 
-  const navItems = [
-    { label: 'მთავარი', href: '#home' },
-    { label: 'ჩემ შესახებ', href: '#about' },
-    { label: 'პროექტები', href: '#projects' },
-    { label: 'კალკულატორი', href: '#calculator' },
-    { label: 'კონტაქტი', href: '#contact' }
-  ];
+  const resolvedNavItems = navItems ?? DEFAULT_NAV_ITEMS;
+  const resolvedHomeHref = homeHref ?? '#home';
+  const resolvedContactHref = contactHref ?? '#contact';
+  const showContact = contactHref !== undefined || !navItems;
+  const toggleTheme = () => setTheme((current) => (current === 'light' ? 'dark' : 'light'));
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
@@ -124,40 +157,21 @@ export default function Header({ activeSection }: HeaderProps) {
   return (
     <>
       <motion.header
-        initial={{ y: -80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.55, ease: 'easeOut' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
         id="navbar"
-        className={`fixed inset-x-0 top-0 z-50 px-5 py-4 transition-all duration-300 sm:px-8 ${
-          isScrolled
-            ? 'border-b border-[var(--brand-line)] bg-[var(--brand-header-surface)] shadow-[var(--brand-shadow-soft)] backdrop-blur-xl'
-            : 'bg-transparent'
+        className={`fixed inset-x-0 top-0 z-50 border-b px-[var(--section-space-x)] transition-[background-color,border-color] duration-300 ${
+          isScrolled && !isMobileMenuOpen
+            ? 'border-[var(--brand-line)] bg-[var(--brand-header-surface)] backdrop-blur-xl'
+            : 'border-transparent bg-transparent'
         }`}
       >
-        <div className="container-xl flex items-center justify-between gap-4">
-          <a
-            href="#home"
-            onClick={(e) => handleNavClick(e, '#home')}
-            className="group flex items-center gap-3 font-sans text-[var(--brand-ink)]"
-          >
-            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg transition-transform duration-300 group-hover:-translate-y-0.5">
-              <span
-                className="brand-mark-glyph"
-                style={{ WebkitMaskImage: `url("${BRAND_MARK}")`, maskImage: `url("${BRAND_MARK}")` }}
-                role="img"
-                aria-label="Luka Imagines"
-              />
-            </span>
-            <div className="flex flex-col leading-none">
-              <span className="text-sm font-bold">Luka Imagines</span>
-              <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--brand-muted)]">
-                გრაფიკული დიზაინერი
-              </span>
-            </div>
-          </a>
+        <div className="container-xl flex h-[76px] items-center justify-between gap-6">
+          <BrandLink href={resolvedHomeHref} onClick={(e) => handleNavClick(e, resolvedHomeHref)} />
 
-          <nav aria-label="მთავარი ნავიგაცია" className="surface-card hidden items-center gap-1 rounded-full p-1 lg:flex">
-            {navItems.map((item) => {
+          <nav aria-label="მთავარი ნავიგაცია" className="hidden items-center gap-9 lg:flex">
+            {resolvedNavItems.map((item) => {
               const isActive = activeSection === item.href.substring(1);
               return (
                 <a
@@ -165,51 +179,50 @@ export default function Header({ activeSection }: HeaderProps) {
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.href)}
                   aria-current={isActive ? 'location' : undefined}
-                  className={`relative rounded-full px-3 py-2 text-xs font-semibold transition-colors duration-200 xl:px-4 ${
-                    isActive ? 'text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
+                  className={`relative py-2 text-[14px] transition-colors duration-200 ${
+                    isActive ? 'text-[var(--brand-ink)]' : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
                   }`}
                 >
+                  {item.label}
                   {isActive && (
                     <motion.span
-                      layoutId="activeNavBubble"
-                      className="absolute inset-0 -z-10 rounded-full bg-[var(--brand-accent)]"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      layoutId="activeNavIndicator"
+                      className="absolute inset-x-0 bottom-0 h-px bg-[var(--brand-ink)]"
+                      transition={{ type: 'spring', stiffness: 420, damping: 36 }}
                     />
                   )}
-                  {item.label}
                 </a>
               );
             })}
           </nav>
 
-          <div className="hidden items-center gap-3 lg:flex">
-            <ThemeToggle
-              theme={theme}
-              onToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
-            />
-            <span className="status-pill flex items-center gap-2 px-3 py-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-success)]" />
-              ხელმისაწვდომია სამუშაოდ
-            </span>
-            <a
-              href="#contact"
-              onClick={(e) => handleNavClick(e, '#contact')}
-              className="button-primary min-h-10 px-4 text-xs"
-            >
-              დამიკავშირდით
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </a>
+          <div className="hidden shrink-0 items-center gap-3 lg:flex">
+            {!themeToggle.gone && <span {...themeToggle.attrs} className="inline-flex"><ThemeToggle theme={theme} onToggle={toggleTheme} /></span>}
+            {showContact && !headerCta.gone ? (
+              <a
+                {...headerCta.attrs}
+                href={headerCta.href(resolvedContactHref)}
+                onClick={(e) => {
+                  const target = headerCta.href(resolvedContactHref);
+                  if (target === resolvedContactHref) { handleNavClick(e, resolvedContactHref); return; }
+                  if (followSiteLink(target)) e.preventDefault();
+                }}
+                target={isExternalLink(headerCta.href(resolvedContactHref)) ? '_blank' : undefined}
+                rel={isExternalLink(headerCta.href(resolvedContactHref)) ? 'noreferrer' : undefined}
+                className="button-secondary min-h-10 px-5 text-[13px]"
+              >
+                <EditableLabel id="header.cta" fallback="დამიკავშირდით" />
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 lg:hidden">
-            <ThemeToggle
-              theme={theme}
-              onToggle={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
-            />
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="icon-button"
+              className="icon-button h-10 w-10"
               aria-label={isMobileMenuOpen ? 'მენიუს დახურვა' : 'მენიუს გახსნა'}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-navigation"
@@ -224,46 +237,48 @@ export default function Header({ activeSection }: HeaderProps) {
         {isMobileMenuOpen && (
           <motion.div
             id="mobile-navigation"
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="surface-card fixed inset-x-4 top-[76px] z-40 flex flex-col gap-5 p-5 shadow-[var(--brand-shadow)] lg:hidden"
+            className="fixed inset-0 z-40 flex flex-col overflow-y-auto bg-[var(--brand-page)] px-[var(--section-space-x)] pb-10 pt-[100px] lg:hidden"
           >
-            <nav aria-label="მობილური ნავიგაცია" className="flex flex-col gap-2">
-              {navItems.map((item) => {
+            <nav aria-label="მობილური ნავიგაცია" className="flex flex-col border-t border-[var(--brand-line)]">
+              {resolvedNavItems.map((item, index) => {
                 const isActive = activeSection === item.href.substring(1);
                 return (
-                  <a
+                  <motion.a
                     key={item.label}
                     href={item.href}
                     onClick={(e) => handleNavClick(e, item.href)}
                     aria-current={isActive ? 'location' : undefined}
-                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 ${
-                      isActive ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)]' : 'text-[var(--brand-muted)] hover:bg-white/60 hover:text-[var(--brand-ink)]'
-                    }`}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.04 * index, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-baseline gap-5 border-b border-[var(--brand-line)] py-5 text-[var(--brand-ink)]"
                   >
-                    {item.label}
-                  </a>
+                    <span className="text-[13px] tabular-nums text-[var(--brand-soft)]">{String(index + 1).padStart(2, '0')}</span>
+                    <span className={`ed-display text-[34px] leading-none ${isActive ? 'text-[var(--brand-accent)]' : ''}`}>{item.label}</span>
+                  </motion.a>
                 );
               })}
             </nav>
 
-            <div className="h-px bg-[var(--brand-line)]" />
-
-            <div className="flex flex-col gap-3">
-              <div className="status-pill flex items-center gap-2 px-3 py-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-success)]" />
-                საქართველო, ქუთაისი
-              </div>
-              <a
-                href="#contact"
-                onClick={(e) => handleNavClick(e, '#contact')}
-                className="button-primary w-full"
-              >
-                ვითანამშრომლოთ
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
+            <div className="mt-auto flex flex-col gap-4 pt-10">
+              <p className="flex items-center gap-2 text-sm text-[var(--brand-muted)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-accent)]" />
+                {profile.location} · {profile.availability.text}
+              </p>
+              {showContact ? (
+                <a
+                  href={resolvedContactHref}
+                  onClick={(e) => handleNavClick(e, resolvedContactHref)}
+                  className="button-primary w-full"
+                >
+                  ვითანამშრომლოთ
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              ) : null}
             </div>
           </motion.div>
         )}

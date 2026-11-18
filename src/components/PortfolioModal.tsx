@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   BriefcaseBusiness,
   Building2,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { getPortfolioCategoryById } from '../data/portfolioItems';
 import { navigateWithinSite } from '../navigation';
+import { isPlaceholderTitle } from '../admin/attention';
 import { PortfolioItem } from '../types';
 
 interface PortfolioModalProps {
@@ -28,6 +29,13 @@ interface PortfolioModalProps {
   imageOnly?: boolean;
 }
 
+const pad = (value: number) => String(value).padStart(2, '0');
+
+/**
+ * Picture viewer. The image-only form (catalog) is a dark room lit by the picture's own colours,
+ * with a thumbnail strip of the whole category along the bottom; arrows, keys and swipes move
+ * between pictures.
+ */
 export default function PortfolioModal({
   item,
   items = [],
@@ -48,8 +56,20 @@ export default function PortfolioModal({
     ? items[selectedIndex + 1]
     : null;
   const isOpen = Boolean(item);
+  const reduceMotion = useReducedMotion() ?? false;
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  // Imported files are titled "1 result" until renamed in the admin; show the category instead.
+  const displayTitle = item && category ? (isPlaceholderTitle(item.title) ? category.label : item.title) : '';
 
   useEffect(() => setHasImageError(false), [item?.image]);
+
+  // The active thumbnail stays in view.
+  useEffect(() => {
+    const strip = filmstripRef.current;
+    const active = strip?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!strip || !active) return;
+    strip.scrollTo({ left: active.offsetLeft - strip.clientWidth / 2 + active.offsetWidth / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, [item?.id, reduceMotion]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -121,112 +141,152 @@ export default function PortfolioModal({
     <AnimatePresence>
       {item && category && (
         <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          className={imageOnly
+            ? 'lightbox fixed inset-0 z-[10000] flex items-center justify-center p-4'
+            : 'fixed inset-0 z-[10000] flex items-center justify-center p-4'}
           role="dialog"
           aria-modal="true"
-          aria-label="Portfolio image preview"
+          aria-label={item ? item.title : 'სურათის ნახვა'}
         >
+          {/* A soft, blurred wash of the picture's own colours fills the room. */}
+          {imageOnly && (
+            <AnimatePresence initial={false}>
+              <motion.img
+                key={`ambient-${item.id}`}
+                src={item.image}
+                alt=""
+                aria-hidden="true"
+                className="lightbox-ambient"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.7, ease: 'easeOut' }}
+              />
+            </AnimatePresence>
+          )}
+
           <motion.button
             type="button"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="absolute inset-0 h-full w-full cursor-zoom-out border-0 bg-[rgba(10,14,12,0.92)] p-0 backdrop-blur-sm"
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className={imageOnly
+              ? 'lightbox-backdrop absolute inset-0 h-full w-full cursor-zoom-out border-0 p-0'
+              : 'absolute inset-0 h-full w-full cursor-zoom-out border-0 bg-[rgba(14,13,12,0.95)] p-0'}
             onClick={onClose}
-            aria-label="Close portfolio image"
+            aria-label="დახურვა"
           />
 
           {imageOnly ? (
             <>
-              <AnimatePresence>
-                {previousItem && onSelect && (
-                  <motion.button
-                    key="previous-image"
-                    type="button"
-                    initial={{ opacity: 0, x: 8, y: '-50%', scale: 0.9 }}
-                    animate={{ opacity: 1, x: 0, y: '-50%', scale: 1 }}
-                    exit={{ opacity: 0, x: 8, y: '-50%', scale: 0.9 }}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                    onClick={() => onSelect(previousItem)}
-                    className="absolute left-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--brand-line-strong)] bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:left-6 sm:h-12 sm:w-12"
-                    aria-label="Previous portfolio image"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </motion.button>
-                )}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-6 px-4 py-4 sm:px-8 sm:py-6"
+              >
+                <div className="min-w-0 pt-1">
+                  <p className="lightbox-title truncate">{displayTitle}</p>
+                  {items.length > 1 && selectedIndex >= 0 && (
+                    <p className="lightbox-count tabular-nums"><b>{pad(selectedIndex + 1)}</b> / {pad(items.length)}</p>
+                  )}
+                </div>
+                <button type="button" onClick={onClose} className="lightbox-button pointer-events-auto shrink-0" aria-label="დახურვა">
+                  <X className="h-4 w-4" />
+                </button>
+              </motion.div>
 
-                {nextItem && onSelect && (
-                  <motion.button
-                    key="next-image"
-                    type="button"
-                    initial={{ opacity: 0, x: -8, y: '-50%', scale: 0.9 }}
-                    animate={{ opacity: 1, x: 0, y: '-50%', scale: 1 }}
-                    exit={{ opacity: 0, x: -8, y: '-50%', scale: 0.9 }}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                    onClick={() => onSelect(nextItem)}
-                    className="absolute right-3 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--brand-line-strong)] bg-white text-[var(--brand-accent)] shadow-[0_16px_44px_rgba(0,0,0,0.28)] sm:right-6 sm:h-12 sm:w-12"
-                    aria-label="Next portfolio image"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
+              {previousItem && onSelect && (
+                <button
+                  type="button"
+                  onClick={() => onSelect(previousItem)}
+                  className="lightbox-button absolute left-3 top-1/2 z-20 -translate-y-1/2 sm:left-8"
+                  aria-label="წინა სურათი"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              )}
+
+              {nextItem && onSelect && (
+                <button
+                  type="button"
+                  onClick={() => onSelect(nextItem)}
+                  className="lightbox-button absolute right-3 top-1/2 z-20 -translate-y-1/2 sm:right-8"
+                  aria-label="შემდეგი სურათი"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              )}
 
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.965 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                transition={{ type: 'spring', damping: 30, stiffness: 260 }}
-                className="relative z-10 flex max-h-[94vh] max-w-[calc(100vw-2rem)] items-center justify-center overflow-hidden rounded-lg border border-[rgba(255,255,255,0.25)] bg-white/10 p-3 shadow-[0_36px_100px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:max-w-[calc(100vw-10rem)] sm:p-5"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="relative z-10 flex items-center justify-center"
                 onClick={(event) => event.stopPropagation()}
               >
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={`ambient-${item.id}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.24, ease: 'easeOut' }}
-                    className="absolute inset-0 overflow-hidden"
-                    aria-hidden="true"
-                  >
-                    <img
-                      src={item.image}
-                      alt=""
-                      className="absolute -inset-[15%] h-[130%] w-[130%] scale-110 object-cover opacity-90 blur-3xl saturate-[1.3]"
-                      onError={(event) => { event.currentTarget.hidden = true; }}
-                    />
-                    <div className="absolute inset-0 bg-[rgba(255,255,255,0.14)] backdrop-blur-xl" />
-                    <div className="absolute inset-0 ring-1 ring-inset ring-[rgba(255,255,255,0.25)]" />
-                  </motion.div>
-                </AnimatePresence>
-
-                <AnimatePresence mode="wait" initial={false}>
                   {hasImageError && onImageError ? (
-                    <div className="relative z-10 flex min-h-48 min-w-48 flex-col items-center justify-center gap-3 rounded-[4px] bg-[var(--brand-page)] p-8 text-center text-sm text-[var(--brand-muted)]">
+                    <div className="lightbox-error flex min-h-48 min-w-48 flex-col items-center justify-center gap-3 p-8 text-center text-sm">
                       <span>სურათის ჩატვირთვა ვერ მოხერხდა</span>
-                      <button type="button" className="button-secondary" onClick={() => { setHasImageError(false); onImageError(item, true); }}>ხელახლა ცდა</button>
+                      <button type="button" className="lightbox-button w-auto px-5 text-sm" onClick={() => { setHasImageError(false); onImageError(item, true); }}>ხელახლა ცდა</button>
                     </div>
                   ) : (
-                    <motion.img
+                    /* Swipe left or right to move between pictures (phones and trackpads). */
+                    <motion.div
                       key={item.id}
-                      src={item.image}
-                      alt={item.title}
-                      initial={{ opacity: 0, scale: 0.985 }}
+                      className="lightbox-frame"
+                      initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.985 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.99 }}
-                      transition={{ duration: 0.2, ease: 'easeOut' }}
-                      className="relative z-10 block max-h-[calc(94vh-1.5rem)] max-w-[calc(100vw-3.5rem)] rounded-[4px] object-contain shadow-[0_18px_50px_rgba(0,0,0,0.24)] sm:max-h-[calc(94vh-2.5rem)] sm:max-w-[calc(100vw-12.5rem)]"
-                      onError={() => { setHasImageError(true); onImageError?.(item); }}
-                    />
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      drag={items.length > 1 && onSelect && !reduceMotion ? 'x' : false}
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0.5}
+                      onDragEnd={(_, info) => {
+                        if (info.offset.x < -70 && nextItem) onSelect?.(nextItem);
+                        else if (info.offset.x > 70 && previousItem) onSelect?.(previousItem);
+                      }}
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        draggable={false}
+                        className="lightbox-image block object-contain"
+                        onError={() => { setHasImageError(true); onImageError?.(item); }}
+                      />
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </motion.div>
+
+              {/* Every picture of the category in a strip along the bottom. */}
+              {items.length > 1 && onSelect && (
+                <motion.div
+                  ref={filmstripRef}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  className="lightbox-filmstrip"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {items.map((candidate, position) => (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      aria-current={candidate.id === item.id ? 'true' : undefined}
+                      aria-label={`სურათი ${position + 1}`}
+                      onClick={() => onSelect(candidate)}
+                    >
+                      <img src={candidate.image} alt="" loading="lazy" decoding="async" />
+                    </button>
+                  ))}
+                </motion.div>
+              )}
             </>
           ) : (
             <motion.div

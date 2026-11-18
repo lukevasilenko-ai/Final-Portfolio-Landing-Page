@@ -3,8 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import {
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ArrowRight,
   Calculator,
   CheckCircle2,
   Clock,
@@ -14,84 +22,76 @@ import {
   Printer,
   Sparkles
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import {
+  DEFAULT_CALCULATOR_CONFIG,
+  explainEstimate,
+  type CalculatorConfig,
+  type CalculatorGroup,
+  type CalculatorService,
+  type EstimateLine,
+} from '../calculator/model';
 import ServicePackages from './ServicePackages';
+import SectionHeader, { stripSectionIndex } from './SectionHeader';
+import { NativeElementSlot } from '../websiteSections/NativeElements';
+import './calculator.css';
 
-type ServiceId =
-  | 'poster'
-  | 'cover'
-  | 'templatePoster'
-  | 'businessCards'
-  | 'googleReviewSet';
-
-type ServiceGroup = 'design' | 'print';
-
-interface Service {
-  label: string;
-  note: string;
-  group: ServiceGroup;
-  priceRange?: [number, number];
-  template?: boolean;
-  supportsExtraFormats?: boolean;
-}
-
-const services: Record<ServiceId, Service> = {
-  poster: {
-    label: 'პოსტერი',
-    note: 'ერთი პოსტერის დიზაინი: 100-130 ლარი',
-    group: 'design',
-    priceRange: [100, 130],
-    supportsExtraFormats: true
-  },
-  cover: {
-    label: 'ქავერი',
-    note: 'Facebook, YouTube, LinkedIn ან სხვა პლატფორმისთვის',
-    group: 'design',
-    priceRange: [70, 100],
-    supportsExtraFormats: true
-  },
-  templatePoster: {
-    label: 'შაბლონური პოსტერი',
-    note: 'დიზაინი 140 ლარი, თითო ცვლილება 20 ლარი',
-    group: 'design',
-    template: true,
-    supportsExtraFormats: true
-  },
-  businessCards: {
-    label: 'სავიზიტო ბარათები',
-    note: 'დიზაინის სტანდარტული ფასი: 50-70 ლარი',
-    group: 'print',
-    priceRange: [50, 70]
-  },
-  googleReviewSet: {
-    label: 'Google Review Set',
-    note: 'დიზაინის სტანდარტული ფასი: 150-250 ლარი',
-    group: 'print',
-    priceRange: [150, 250]
-  }
+const groupIcon: Record<CalculatorGroup['icon'], typeof Calculator> = {
+  calculator: Calculator,
+  printer: Printer,
+  sparkles: Sparkles,
+  layers: Layers,
 };
 
-const serviceGroups: Array<{
-  id: ServiceGroup;
-  label: string;
-  icon: typeof Calculator;
-  items: ServiceId[];
-}> = [
-  {
-    id: 'design',
-    label: 'დიზაინის მომსახურება',
-    icon: Calculator,
-    items: ['poster', 'cover', 'templatePoster']
-  },
-  {
-    id: 'print',
-    label: 'საბეჭდი მასალა',
-    icon: Printer,
-    items: ['businessCards', 'googleReviewSet']
-  }
-];
+const GEORGIAN_MONTHS = ['იანვარი', 'თებერვალი', 'მარტი', 'აპრილი', 'მაისი', 'ივნისი', 'ივლისი', 'აგვისტო', 'სექტემბერი', 'ოქტომბერი', 'ნოემბერი', 'დეკემბერი'];
 
-const roundToFive = (value: number) => Math.round(value / 5) * 5;
+/** What a service costs on its own, for the price tag on its card. */
+const priceTag = (service: CalculatorService) => service.pricing.type === 'range'
+  ? `${service.pricing.min}–${service.pricing.max} ₾`
+  : service.pricing.type === 'per_item'
+    ? `${service.pricing.amount} ₾ / ცალი`
+    : `${service.pricing.amount} ₾`;
+
+/** "+20 ₾", "−24–31 ₾", "120–155 ₾" for a receipt line. */
+function lineAmount(line: EstimateLine) {
+  const signed = line.id !== 'base';
+  const format = (value: number) => (value === 0 ? '0' : `${value < 0 ? '−' : signed ? '+' : ''}${Math.abs(value)}`);
+  if (line.min === line.max) return `${format(line.min)} ₾`;
+  if ((line.min < 0) !== (line.max < 0)) return `${format(line.min)} / ${format(line.max)} ₾`;
+  const low = Math.min(Math.abs(line.min), Math.abs(line.max));
+  const high = Math.max(Math.abs(line.min), Math.abs(line.max));
+  return `${line.min < 0 ? '−' : signed ? '+' : ''}${low}–${high} ₾`;
+}
+
+/** Counts smoothly from the previous value to the new one (instantly for reduced motion). */
+function useCountUp(target: number, duration = 650) {
+  const reduceMotion = useReducedMotion() ?? false;
+  const [value, setValue] = useState(target);
+  const shown = useRef(target);
+  useEffect(() => {
+    if (reduceMotion) { shown.current = target; setValue(target); return; }
+    const from = shown.current;
+    if (from === target) return;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const next = from + (target - from) * (1 - (1 - progress) ** 3);
+      shown.current = next;
+      setValue(next);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [duration, reduceMotion, target]);
+  return Math.round(value);
+}
+
+function CountUp({ value }: { value: number }) {
+  return <>{useCountUp(value)}</>;
+}
+
+interface RangeMark { value: number; label: string; discount?: boolean }
 
 interface SmoothRangeProps {
   min: number;
@@ -99,9 +99,10 @@ interface SmoothRangeProps {
   value: number;
   onChange: (value: number) => void;
   ariaLabel: string;
+  marks?: RangeMark[];
 }
 
-function SmoothRange({ min, max, value, onChange, ariaLabel }: SmoothRangeProps) {
+function SmoothRange({ min, max, value, onChange, ariaLabel, marks = [] }: SmoothRangeProps) {
   const [draftValue, setDraftValue] = useState(value);
   const [isDragging, setIsDragging] = useState(false);
   const progress = ((draftValue - min) / (max - min)) * 100;
@@ -145,186 +146,298 @@ function SmoothRange({ min, max, value, onChange, ariaLabel }: SmoothRangeProps)
   };
 
   return (
-    <div className="smooth-range-wrap">
-      <div
-        className={`smooth-range-fill${isDragging ? ' is-dragging' : ''}`}
-        style={{ transform: `translateY(-50%) scaleX(${progress / 100})` }}
-      />
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step="0.01"
-        value={draftValue}
-        onPointerDown={() => setIsDragging(true)}
-        onPointerUp={(event) => commitValue(Number(event.currentTarget.value))}
-        onPointerCancel={(event) => commitValue(Number(event.currentTarget.value))}
-        onBlur={(event) => commitValue(Number(event.currentTarget.value))}
-        onChange={(event) => updateDraftValue(Number(event.currentTarget.value))}
-        onKeyDown={handleKeyDown}
-        className="smooth-range"
-        aria-label={ariaLabel}
-        aria-valuetext={String(Math.round(draftValue))}
-      />
+    <div className="smooth-range-block">
+      <div className="smooth-range-wrap">
+        <div
+          className={`smooth-range-fill${isDragging ? ' is-dragging' : ''}`}
+          style={{ transform: `translateY(-50%) scaleX(${progress / 100})` }}
+        />
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step="0.01"
+          value={draftValue}
+          onPointerDown={() => setIsDragging(true)}
+          onPointerUp={(event) => commitValue(Number(event.currentTarget.value))}
+          onPointerCancel={(event) => commitValue(Number(event.currentTarget.value))}
+          onBlur={(event) => commitValue(Number(event.currentTarget.value))}
+          onChange={(event) => updateDraftValue(Number(event.currentTarget.value))}
+          onKeyDown={handleKeyDown}
+          className="smooth-range"
+          aria-label={ariaLabel}
+          aria-valuetext={String(Math.round(draftValue))}
+        />
+      </div>
+      {/* Ends of the scale, and where quantity discounts begin. */}
+      {marks.length > 0 && max > min && (
+        <div className="smooth-range-marks" aria-hidden="true">
+          {marks.map((mark) => (
+            <span
+              key={`${mark.value}-${mark.label}`}
+              className={`${value >= mark.value ? 'is-reached' : ''}${mark.discount ? ' is-discount' : ''}`}
+              style={{ left: `${((mark.value - min) / (max - min)) * 100}%` }}
+            >{mark.label}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function PriceCalculator() {
-  const [activeGroup, setActiveGroup] = useState<ServiceGroup>('design');
-  const [service, setService] = useState<ServiceId>('poster');
+/**
+ * Price calculator: choose a service and its options; the estimate is shown as a printed receipt
+ * with every line of the price, a counting total, and a button that carries the choice into the
+ * contact form. A soft accent light follows the pointer across the card.
+ */
+export default function PriceCalculator({ config: previewConfig }: { config?: CalculatorConfig }) {
+  const reduceMotion = useReducedMotion() ?? false;
+  const [publishedConfig, setPublishedConfig] = useState(DEFAULT_CALCULATOR_CONFIG);
+  const [loadWarning, setLoadWarning] = useState('');
+  const [activeGroup, setActiveGroup] = useState('design');
+  const [service, setService] = useState('poster');
   const [quantity, setQuantity] = useState(1);
   const [templateChanges, setTemplateChanges] = useState(0);
   const [rush, setRush] = useState(false);
-  const [extraFormats, setExtraFormats] = useState(false);
+  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+  const requestedConfig = previewConfig ?? publishedConfig;
+  const hasActiveService = requestedConfig.groups.some((group) => group.enabled
+    && requestedConfig.services.some((item) => item.enabled && item.groupId === group.id));
+  const currentConfig = hasActiveService ? requestedConfig : DEFAULT_CALCULATOR_CONFIG;
+  const activeGroups = currentConfig.groups
+    .filter((group) => group.enabled && currentConfig.services.some((item) => item.enabled && item.groupId === group.id))
+    .sort((a, b) => a.order - b.order);
+  const activeServiceGroup = activeGroups.find((group) => group.id === activeGroup) ?? activeGroups[0];
+  const groupServices = activeServiceGroup
+    ? currentConfig.services.filter((item) => item.enabled && item.groupId === activeServiceGroup.id).sort((a, b) => a.order - b.order)
+    : [];
+  const selectedService: CalculatorService = groupServices.find((item) => item.id === service)
+    ?? groupServices[0]
+    ?? currentConfig.services[0];
+  const copy = currentConfig.copy;
 
-  const selectedService = services[service];
-  const activeServiceGroup = serviceGroups.find((group) => group.id === activeGroup) ?? serviceGroups[0];
+  useEffect(() => {
+    if (previewConfig || (import.meta.env.MODE !== 'staging' && !import.meta.env.PROD)) return;
+    let active = true;
+    void import('../calculator/repository')
+      .then(({ loadPublishedCalculator }) => loadPublishedCalculator())
+      .then((result) => {
+        if (!active) return;
+        setPublishedConfig(result.config);
+        setLoadWarning(result.warning ?? '');
+      })
+      .catch(() => {
+        if (!active) return;
+        setPublishedConfig(DEFAULT_CALCULATOR_CONFIG);
+        setLoadWarning('გამოქვეყნებული კონფიგურაცია ვერ ჩაიტვირთა. ნაჩვენებია საწყისი ფასები.');
+      });
+    return () => { active = false; };
+  }, [previewConfig]);
 
-  const estimate = useMemo(() => {
-    const rushMultiplier = rush ? 1.2 : 1;
-    const serviceQuantity = selectedService.template ? 1 : quantity;
-    const extraFormatsFee = selectedService.supportsExtraFormats && extraFormats
-      ? 15 * serviceQuantity
-      : 0;
+  useEffect(() => {
+    if (!activeServiceGroup) return;
+    if (activeGroup !== activeServiceGroup.id) setActiveGroup(activeServiceGroup.id);
+    if (!groupServices.some((item) => item.id === service)) setService(groupServices[0]?.id ?? '');
+  }, [activeGroup, activeServiceGroup, currentConfig, groupServices, service]);
 
-    if (selectedService.template) {
-      const templateBase = 140;
-      const changesFee = templateChanges * 20;
-      const total = roundToFive((templateBase + changesFee + extraFormatsFee) * rushMultiplier);
-
-      return { min: total, max: total };
-    }
-
-    const base = selectedService.priceRange as [number, number];
-    const quantityDiscount = quantity >= 6 ? 0.88 : quantity >= 3 ? 0.92 : 1;
-    const min = roundToFive((base[0] * quantity * quantityDiscount * rushMultiplier) + extraFormatsFee);
-    const max = roundToFive((base[1] * quantity * quantityDiscount * rushMultiplier) + extraFormatsFee);
-
-    return { min, max };
-  }, [extraFormats, quantity, rush, selectedService, templateChanges]);
+  const explained = useMemo(() => explainEstimate(currentConfig, {
+    serviceId: selectedService.id,
+    quantity,
+    changes: templateChanges,
+    rush,
+    selectedExtras,
+  }), [currentConfig, quantity, rush, selectedExtras, selectedService, templateChanges]);
+  const estimate = explained.total;
 
   const estimateLabel = estimate.min === estimate.max
     ? `${estimate.min} ლარი`
     : `${estimate.min}-${estimate.max} ლარი`;
 
   const setQuantitySafely = (nextValue: number) => {
-    setQuantity(Math.min(10, Math.max(1, nextValue)));
+    setQuantity(Math.min(selectedService.quantity.max, Math.max(selectedService.quantity.min, nextValue)));
   };
 
   const setTemplateChangesSafely = (nextValue: number) => {
-    setTemplateChanges(Math.min(20, Math.max(0, nextValue)));
+    const changes = selectedService.changes;
+    if (changes) setTemplateChanges(Math.min(changes.max, Math.max(changes.min, nextValue)));
   };
 
-  const selectService = (nextService: ServiceId) => {
+  const selectService = (nextService: string) => {
     setService(nextService);
-
-    if (services[nextService].template) {
+    const next = currentConfig.services.find((item) => item.id === nextService);
+    if (next?.changes?.enabled) {
       setQuantity(1);
       setRush(false);
-      setExtraFormats(false);
+      setSelectedExtras([]);
+    } else if (next?.quantity.enabled) {
+      setQuantity((value) => Math.min(next.quantity.max, Math.max(next.quantity.min, value)));
     }
   };
 
-  const selectServiceGroup = (nextGroup: ServiceGroup) => {
-    const group = serviceGroups.find((candidate) => candidate.id === nextGroup);
-
-    if (!group) return;
-
-    setActiveGroup(nextGroup);
-    setService(group.items[0]);
+  const selectServiceGroup = (group: CalculatorGroup) => {
+    const firstService = currentConfig.services
+      .filter((item) => item.enabled && item.groupId === group.id)
+      .sort((a, b) => a.order - b.order)[0];
+    if (!firstService) return;
+    setActiveGroup(group.id);
+    setService(firstService.id);
     setQuantity(1);
     setTemplateChanges(0);
     setRush(false);
-    setExtraFormats(false);
+    setSelectedExtras([]);
   };
 
+  const isTemplate = Boolean(selectedService.changes?.enabled);
+  const selectedExtraOptions = selectedService.extras.filter((extra) => extra.enabled);
+  const extraLabel = (id: string, fallback: string) => (id === 'extra-sizes' ? copy.extraSizesLabel : fallback);
+  const serviceGridColumns = currentConfig.appearance.serviceColumns === 'two'
+    ? 'grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2'
+    : 'grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3';
+  const quantityLabel = selectedService.quantity.label || copy.quantityLabel;
+  const changesLabel = selectedService.changes?.label || copy.changesLabel;
+  const categoryName = activeServiceGroup.id === 'design' ? copy.designCategory : activeServiceGroup.label;
+
+  // Marks on the quantity scale: both ends and every discount threshold.
+  const quantityMarks: RangeMark[] = selectedService.quantity.enabled ? [
+    { value: selectedService.quantity.min, label: String(selectedService.quantity.min) },
+    ...selectedService.discounts
+      .filter((tier) => tier.minimumQuantity > selectedService.quantity.min && tier.minimumQuantity < selectedService.quantity.max)
+      .map((tier) => ({ value: tier.minimumQuantity, label: `−${tier.percent}%`, discount: true })),
+    { value: selectedService.quantity.max, label: String(selectedService.quantity.max) },
+  ] : [];
+  const nudge = selectedService.quantity.enabled
+    ? explained.nextDiscount
+      ? `${explained.discountPercent ? `ახლა −${explained.discountPercent}% · ` : ''}კიდევ ${explained.nextDiscount.minimumQuantity - quantity} ცალი — და ფასდაკლება ${explained.nextDiscount.percent}%`
+      : explained.discountPercent ? `ფასდაკლება ${explained.discountPercent}% უკვე მოქმედებს` : ''
+    : '';
+
+  // Georgian month names written out: not every browser ships Georgian date formatting.
+  const today = useMemo(() => {
+    const date = new Date();
+    return `${date.getDate()} ${GEORGIAN_MONTHS[date.getMonth()]}, ${date.getFullYear()}`;
+  }, []);
+
+  // "Order": the chosen settings go into the contact form's subject and description.
+  const sendToContact = () => {
+    const chosenExtras = selectedExtraOptions.filter((extra) => selectedExtras.includes(extra.id));
+    const message = [
+      'გამარჯობა! ფასის კალკულატორით დავითვალე:',
+      `• მომსახურება: ${selectedService.label}`,
+      ...(selectedService.quantity.enabled ? [`• ${quantityLabel}: ${quantity}`] : []),
+      ...(selectedService.changes?.enabled ? [`• ${changesLabel}: ${templateChanges}`] : []),
+      ...(rush ? [`• ${selectedService.rush.label || copy.rushLabel}`] : []),
+      ...chosenExtras.map((extra) => `• ${extraLabel(extra.id, extra.label)}`),
+      `სავარაუდო ბიუჯეტი: ${estimateLabel}`,
+      '',
+      'დამატებითი დეტალები: ',
+    ].join('\n');
+    window.dispatchEvent(new CustomEvent('luka-calculator-request', {
+      detail: { subject: `${selectedService.label} — ${estimateLabel}`, message },
+    }));
+  };
+
+  // A soft accent light follows the pointer across the card.
+  const followSpotlight = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse') return;
+    const box = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty('--sx', `${Math.round(event.clientX - box.left)}px`);
+    event.currentTarget.style.setProperty('--sy', `${Math.round(event.clientY - box.top)}px`);
+  };
+
+  if (!requestedConfig.enabled && !previewConfig) return null;
+
+  const indicatorTransition = reduceMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 420, damping: 36 };
+
   return (
-    <section id="calculator" className="section-wrap section-rule">
+    <section
+      id="calculator"
+      data-calculator-palette={currentConfig.appearance.palette}
+      data-calculator-typography={currentConfig.appearance.typography}
+      data-calculator-layout={currentConfig.appearance.layout}
+      className={`section-wrap ed-section calculator-palette-${currentConfig.appearance.palette}${previewConfig ? ' calculator-live-preview' : ''}`}
+    >
       <div className="container-xl">
-        <div className="mb-12 flex max-w-3xl flex-col gap-5">
-          <span className="eyebrow">
-            <span className="eyebrow-dot" />
-            05 // ფასის კალკულატორი
-          </span>
-          <h2 className="section-title">დათვალეთ სავარაუდო ბიუჯეტი.</h2>
-          <p className="section-subtitle max-w-2xl">
-            აირჩიეთ დიზაინის მომსახურება ან საბეჭდი მასალა და მიუთითეთ საჭირო პარამეტრები.
-          </p>
-        </div>
+        <SectionHeader
+          eyebrow={{ slot: 'calculator.eyebrow', content: stripSectionIndex(copy.eyebrow) }}
+          title={{ slot: 'calculator.title', content: copy.title }}
+          description={{ slot: 'calculator.description', content: copy.description }}
+        />
 
-        <div className="surface-card-strong grid grid-cols-1 gap-0 overflow-hidden lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="flex flex-col gap-8 p-6 sm:p-8">
-            <div
-              className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--brand-line)] bg-white/45 p-1"
-              role="tablist"
-              aria-label="მომსახურების ტიპი"
-            >
-              {serviceGroups.map((group) => {
-                const GroupIcon = group.icon;
-                const isActive = activeGroup === group.id;
+        {loadWarning && !previewConfig && <p className="calculator-load-warning" role="status">{loadWarning}</p>}
 
-                return (
+        <NativeElementSlot id="calculator.widget"><div
+          className={`calc surface-card-strong grid grid-cols-1 gap-0 overflow-hidden ${currentConfig.appearance.layout === 'split' ? 'lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]' : 'lg:grid-cols-1'}`}
+          onPointerMove={followSpotlight}
+        >
+          <div className="calc-controls flex flex-col gap-8 p-6 sm:p-9">
+            <div className="flex flex-col gap-8">
+              <div
+                className="segmented"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, activeGroups.length)}, minmax(0, 1fr))` }}
+                role="tablist"
+                aria-label={copy.groupsLabel}
+              >
+                {activeGroups.map((group) => {
+                  const GroupIcon = groupIcon[group.icon];
+                  const isActive = activeGroup === group.id;
+
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-controls={`calculator-${group.id}-services`}
+                      onClick={() => selectServiceGroup(group)}
+                      className="segmented-item"
+                    >
+                      {/* The marker glides from the old tab to the new one. */}
+                      {isActive && <motion.span layoutId="calc-tab-indicator" className="calc-tab-indicator" transition={indicatorTransition} aria-hidden="true" />}
+                      <GroupIcon className="calc-tab-icon h-4 w-4 shrink-0" />
+                      <span className="calc-tab-label">{group.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <motion.div
+                key={activeServiceGroup.id}
+                id={`calculator-${activeServiceGroup.id}-services`}
+                role="tabpanel"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className={`grid ${serviceGridColumns}`}
+              >
+                {groupServices.map((item) => (
                   <button
-                    key={group.id}
+                    key={item.id}
                     type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={`calculator-${group.id}-services`}
-                    onClick={() => selectServiceGroup(group.id)}
-                    className={`flex min-h-12 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-bold transition-colors ${
-                      isActive
-                        ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)] shadow-[var(--brand-accent-shadow-xs)]'
-                        : 'text-[var(--brand-muted)] hover:bg-white hover:text-[var(--brand-ink)]'
-                    }`}
+                    aria-pressed={service === item.id}
+                    onClick={() => selectService(item.id)}
+                    className="choice-tile calc-tile px-4 py-4 text-left"
                   >
-                    <GroupIcon className="h-4 w-4 shrink-0" />
-                    <span>{group.label}</span>
+                    <span className="calc-tile-name block text-[15px] font-bold text-[var(--brand-ink)]">{item.label}</span>
+                    <span className="mt-1.5 block text-[13px] leading-6">{item.note}</span>
+                    <span className="calc-tile-price">{priceTag(item)}</span>
                   </button>
-                );
-              })}
+                ))}
+              </motion.div>
             </div>
 
-            <motion.div
-              key={activeServiceGroup.id}
-              id={`calculator-${activeServiceGroup.id}-services`}
-              role="tabpanel"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              {activeServiceGroup.items.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  aria-pressed={service === item}
-                  onClick={() => selectService(item)}
-                  className={`rounded-lg border px-4 py-4 text-left transition-colors ${
-                    service === item
-                      ? 'border-[var(--brand-accent)] bg-[var(--brand-accent-soft)] text-[var(--brand-ink)]'
-                      : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
-                  }`}
-                >
-                  <span className="block text-base font-bold">{services[item].label}</span>
-                  <span className="mt-2 block text-sm leading-6">{services[item].note}</span>
-                </button>
-              ))}
-            </motion.div>
-
-            {!selectedService.template && (
-              <div className="flex flex-col gap-3">
+            {selectedService.quantity.enabled && (
+              <div style={{ order: 2 + selectedService.controlsOrder.indexOf('quantity') }} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-ink)]">
-                    <Layers className="h-4 w-4 text-[var(--brand-copper)]" />
-                    რაოდენობა
+                    <Layers className="h-4 w-4 text-[var(--brand-accent)]" />
+                    {quantityLabel}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setQuantitySafely(quantity - 1)}
                       className="icon-button h-9 w-9"
-                      aria-label="Decrease quantity"
+                      aria-label="რაოდენობის შემცირება"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -333,7 +446,7 @@ export default function PriceCalculator() {
                       initial={{ y: 8, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       transition={{ duration: 0.2, ease: 'easeOut' }}
-                      className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-[var(--brand-line)] bg-white/60 font-mono text-sm font-bold text-[var(--brand-ink)]"
+                      className="stepper-value"
                     >
                       {quantity}
                     </motion.span>
@@ -341,35 +454,39 @@ export default function PriceCalculator() {
                       type="button"
                       onClick={() => setQuantitySafely(quantity + 1)}
                       className="icon-button h-9 w-9"
-                      aria-label="Increase quantity"
+                      aria-label="რაოდენობის გაზრდა"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
                 <SmoothRange
-                  min={1}
-                  max={10}
+                  min={selectedService.quantity.min}
+                  max={selectedService.quantity.max}
                   value={quantity}
                   onChange={setQuantitySafely}
-                  ariaLabel="Project quantity"
+                  ariaLabel={quantityLabel}
+                  marks={quantityMarks}
                 />
+                {nudge && (
+                  <p className="calc-nudge" aria-live="polite"><span className="calc-nudge-dot" aria-hidden="true" />{nudge}</p>
+                )}
               </div>
             )}
 
-            {selectedService.template && (
-              <div className="flex flex-col gap-3">
+            {selectedService.changes?.enabled && (
+              <div style={{ order: 2 + selectedService.controlsOrder.indexOf('changes') }} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-ink)]">
-                    <Sparkles className="h-4 w-4 text-[var(--brand-plum)]" />
-                    ცვლილებების რაოდენობა
+                    <Sparkles className="h-4 w-4 text-[var(--brand-accent)]" />
+                    {changesLabel}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setTemplateChangesSafely(templateChanges - 1)}
                       className="icon-button h-9 w-9"
-                      aria-label="Decrease template changes"
+                      aria-label="ცვლილებების რაოდენობის შემცირება"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -378,7 +495,7 @@ export default function PriceCalculator() {
                       initial={{ y: 8, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       transition={{ duration: 0.2, ease: 'easeOut' }}
-                      className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-[var(--brand-line)] bg-white/60 font-mono text-sm font-bold text-[var(--brand-ink)]"
+                      className="stepper-value"
                     >
                       {templateChanges}
                     </motion.span>
@@ -386,121 +503,142 @@ export default function PriceCalculator() {
                       type="button"
                       onClick={() => setTemplateChangesSafely(templateChanges + 1)}
                       className="icon-button h-9 w-9"
-                      aria-label="Increase template changes"
+                      aria-label="ცვლილებების რაოდენობის გაზრდა"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
                 <SmoothRange
-                  min={0}
-                  max={20}
+                  min={selectedService.changes.min}
+                  max={selectedService.changes.max}
                   value={templateChanges}
                   onChange={setTemplateChangesSafely}
-                  ariaLabel="Template changes quantity"
+                  ariaLabel={changesLabel}
+                  marks={[
+                    { value: selectedService.changes.min, label: String(selectedService.changes.min) },
+                    { value: selectedService.changes.max, label: String(selectedService.changes.max) },
+                  ]}
                 />
                 <p className="text-sm leading-7 text-[var(--brand-muted)]">
-                  ერთი შაბლონური პოსტერის დიზაინი ღირს 140 ლარი. თითო ცვლილება ემატება 20 ლარად; სასწრაფო ვადა და დამატებითი ზომები ცალკე ითვლება.
+                  {copy.templateInfo}
                 </p>
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setRush((value) => !value)}
-                className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                  rush
-                    ? 'border-[var(--brand-copper)] bg-[var(--brand-copper-soft)] text-[var(--brand-ink)]'
-                    : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
-                }`}
-              >
-                <Clock className="h-4 w-4 shrink-0" />
-                სასწრაფო ვადა
-              </button>
+            {(selectedService.rush.enabled || selectedExtraOptions.length > 0) && (
+              <div style={{ order: 2 + selectedService.controlsOrder.indexOf('options') }} className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {selectedService.rush.enabled && <button
+                    type="button"
+                    aria-pressed={rush}
+                    onClick={() => setRush((value) => !value)}
+                    className="choice-tile calc-option flex items-center gap-3 px-4 py-3.5 text-left text-sm font-semibold"
+                  >
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0">{selectedService.rush.label || copy.rushLabel}</span>
+                    <span className="calc-option-chip">+{selectedService.rush.percent}%</span>
+                  </button>}
 
-              {selectedService.supportsExtraFormats && (
-                <button
-                  type="button"
-                  onClick={() => setExtraFormats((value) => !value)}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                    extraFormats
-                      ? 'border-[var(--brand-accent)] bg-[var(--brand-accent-soft)] text-[var(--brand-ink)]'
-                      : 'border-[var(--brand-line)] bg-white/55 text-[var(--brand-muted)] hover:bg-white'
-                  }`}
-                >
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  დამატებითი ზომები (სთორი/ბანერი)
-                </button>
-              )}
-            </div>
+                  {selectedExtraOptions.map((extra) => {
+                    const isSelected = selectedExtras.includes(extra.id);
+                    return (
+                      <button
+                        key={extra.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedExtras((current) => isSelected
+                          ? current.filter((id) => id !== extra.id)
+                          : [...current, extra.id])}
+                        className="choice-tile calc-option flex items-center gap-3 px-4 py-3.5 text-left text-sm font-semibold"
+                      >
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0">{extraLabel(extra.id, extra.label)}</span>
+                        <span className="calc-option-chip">+{extra.amount} ₾{extra.billing === 'per_item' && selectedService.quantity.enabled ? ' / ც' : ''}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col justify-between gap-8 border-t border-[var(--brand-line)] bg-[var(--brand-accent-wash)] p-6 sm:p-8 lg:border-l lg:border-t-0">
-            <div className="flex flex-col gap-5">
-              <span className="eyebrow">
-                <span className="eyebrow-dot" />
-                შეფასება
-              </span>
-              <div className="flex flex-col gap-2">
-                <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] text-[var(--brand-muted)]">
-                  სავარაუდო დიაპაზონი
-                </span>
-                <motion.strong
-                  key={estimateLabel}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.24, ease: 'easeOut' }}
-                  className="text-5xl font-extrabold leading-tight text-[var(--brand-accent)]"
-                >
-                  {estimateLabel}
-                </motion.strong>
+          <div className={`calc-summary flex flex-col border-t border-[var(--brand-line)] bg-[var(--brand-page-soft)] p-6 sm:p-9 ${currentConfig.appearance.layout === 'split' ? 'lg:border-l lg:border-t-0' : 'lg:border-l-0 lg:border-t'}`}>
+            <div className="calc-summary-body">
+              <div className="calc-receipt">
+                <div className="calc-receipt-head">
+                  <span className="eyebrow">
+                    <span className="eyebrow-dot" aria-hidden="true" />
+                    {copy.estimateEyebrow}
+                  </span>
+                  <span className="calc-receipt-date">{today}</span>
+                </div>
+
+                <dl className="calc-meta">
+                  <div><dt>{copy.categoryLabel}</dt><dd>{categoryName}</dd></div>
+                  <div><dt>{copy.serviceLabel}</dt><dd>{selectedService.label}</dd></div>
+                </dl>
+
+                {/* What the price is made of; lines come and go as options change. */}
+                <ul className="calc-lines" aria-label="ფასის შემადგენლობა">
+                  <AnimatePresence initial={false}>
+                    {explained.lines.map((line) => {
+                      const extraId = line.id.startsWith('extra:') ? line.id.slice(6) : '';
+                      const extra = extraId ? selectedService.extras.find((item) => item.id === extraId) : undefined;
+                      const label = extra ? line.label.replace(extra.label, extraLabel(extra.id, extra.label)) : line.label;
+                      return (
+                        <motion.li
+                          key={line.id}
+                          className={`calc-line is-${line.id.split(':')[0]}`}
+                          initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                        >
+                          <div className="calc-line-row">
+                            <span className="calc-line-label">{label}</span>
+                            <span className="calc-line-fill" aria-hidden="true" />
+                            <span className="calc-line-amount">{lineAmount(line)}</span>
+                          </div>
+                        </motion.li>
+                      );
+                    })}
+                  </AnimatePresence>
+                </ul>
+                {isTemplate && selectedService.changes && (
+                  <p className="calc-line-note">{copy.oneChangeLabel}: {selectedService.changes.amountPerChange} ლარი</p>
+                )}
+
+                <div className="calc-total-row">
+                  <span className="calc-total-label">{copy.estimateLabel}</span>
+                  <strong className="calc-total ed-display">
+                    <span className="calc-total-num tabular-nums" aria-hidden="true">
+                      <CountUp value={estimate.min} />
+                      {estimate.min !== estimate.max && <>–<CountUp value={estimate.max} /></>}
+                    </span>
+                    <small aria-hidden="true">ლარი</small>
+                    <span className="sr-only" aria-live="polite">{estimateLabel}</span>
+                  </strong>
+                </div>
+                <span className="calc-receipt-code" aria-hidden="true" />
               </div>
-              <p className="text-sm leading-7 text-[var(--brand-muted)]">
-                {selectedService.template
-                  ? 'შაბლონურ პოსტერზე ფასი ითვლება ფორმულით: დიზაინი 140 ლარი + თითო ცვლილება 20 ლარი.'
-                  : 'ეს არის საორიენტაციო ფასი. ზუსტი ღირებულება დასტურდება ბრიფისა და სამუშაოს მოცულობის ნახვის შემდეგ.'}
+
+              <p className="calc-summary-text">
+                {isTemplate ? copy.templateEstimateDescription : copy.estimateDescription}
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-[var(--brand-line)] pt-5 text-sm text-[var(--brand-muted)]">
-              <div className="flex items-center justify-between gap-4">
-                <span>კატეგორია</span>
-                <strong className="text-right text-[var(--brand-ink)]">
-                  {selectedService.group === 'print' ? 'საბეჭდი მასალა' : 'დიზაინი'}
-                </strong>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span>მომსახურება</span>
-                <strong className="text-right text-[var(--brand-ink)]">{selectedService.label}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span>რაოდენობა</span>
-                <strong className="text-[var(--brand-ink)]">
-                  {selectedService.template ? 1 : quantity}
-                </strong>
-              </div>
-              {selectedService.template && (
-                <>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>ცვლილებები</span>
-                    <strong className="text-[var(--brand-ink)]">{templateChanges}</strong>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>1 ცვლილება</span>
-                    <strong className="text-[var(--brand-ink)]">20 ლარი</strong>
-                  </div>
-                </>
-              )}
+            <div className="calc-cta-wrap">
+              <a href="#contact" className="button-primary calc-cta w-full" onClick={sendToContact}>
+                {copy.resultButton}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <p className="calc-cta-note">არჩეული პარამეტრები ავტომატურად ჩაიწერება შეტყობინებაში.</p>
             </div>
-
-            <a href="#contact" className="button-primary w-full">
-              შეკვეთის განხილვა
-            </a>
           </div>
-        </div>
+        </div></NativeElementSlot>
 
-        <ServicePackages />
+        <ServicePackages config={currentConfig} />
       </div>
     </section>
   );

@@ -4,8 +4,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, ImageIcon } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { ArrowLeft } from 'lucide-react';
 import {
   getPortfolioCategoryBySlug
 } from '../data/portfolioItems';
@@ -52,6 +52,52 @@ const navigateToCategory = (categoryId: PortfolioCategoryId, slug: string) => {
 const navigateToProject = (categoryId: PortfolioItemCategory, projectSlug: string) => {
   navigateWithinSite(`/portfolio/${categoryId}/${projectSlug}`);
 };
+
+const ease = [0.16, 1, 0.3, 1] as const;
+
+/** Editorial page header shared by the catalog and project pages: back link in the side column, title and facts in the main one. */
+function CatalogHeader({ back, kicker, title, description, meta = [] }: {
+  back: { label: string; onClick: () => void };
+  kicker: string;
+  title: string;
+  description?: string;
+  meta?: { label: string; value: string }[];
+}) {
+  const reduceMotion = useReducedMotion();
+  const reveal = (delay: number) => (reduceMotion ? {} : {
+    initial: { opacity: 0, y: 18 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.7, ease, delay },
+  });
+
+  return (
+    <section className="catalog-header px-[var(--section-space-x)]">
+      <div className="container-xl ed-grid gap-y-10">
+        <div className="ed-aside">
+          <button type="button" onClick={back.onClick} className="ed-link">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {back.label}
+          </button>
+        </div>
+        <div className="ed-main flex flex-col gap-7">
+          <motion.span {...reveal(0)} className="ed-kicker">{kicker}</motion.span>
+          <motion.h1 {...reveal(0.05)} className="section-title">{title}</motion.h1>
+          {description && <motion.p {...reveal(0.12)} className="section-subtitle">{description}</motion.p>}
+          {meta.length > 0 && (
+            <motion.dl {...reveal(0.18)} className="catalog-meta">
+              {meta.map((item) => (
+                <div key={item.label}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.value}</dd>
+                </div>
+              ))}
+            </motion.dl>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function PortfolioCatalogPage() {
   const useSupabaseSource = import.meta.env.VITE_PUBLIC_CATALOG_SOURCE === 'supabase';
@@ -192,7 +238,7 @@ export default function PortfolioCatalogPage() {
         <section className="section-wrap pb-10">
           <div className="container-xl">
             <div className="flex min-h-[270px] flex-col items-start justify-end gap-4 border-b border-[var(--brand-line)] pb-10 pt-20">
-              <span className="eyebrow"><span className="eyebrow-dot" />კატალოგი</span>
+              <span className="ed-kicker">კატალოგი</span>
               <h1 className="section-title">კატალოგის ჩატვირთვა ვერ მოხერხდა</h1>
               <p className="section-subtitle max-w-3xl">{errorMessage}</p>
               <button type="button" onClick={reload} className="button-secondary">ხელახლა ცდა</button>
@@ -206,56 +252,26 @@ export default function PortfolioCatalogPage() {
   if (activeProject) {
     return (
       <main id="main-content" tabIndex={-1} className="content-layer outline-none">
-        <section className="section-wrap pb-10">
-          <div className="container-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="flex min-h-[300px] flex-col justify-end gap-7 border-b border-[var(--brand-line)] pb-10 pt-20"
-            >
-              <button
-                type="button"
-                onClick={() => navigateToCategory(activeCategory.id, activeCategory.slug)}
-                className="button-secondary w-fit gap-2 text-xs"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {activeCategory.label}
-              </button>
+        <CatalogHeader
+          back={{ label: activeCategory.label, onClick: () => navigateToCategory(activeCategory.id, activeCategory.slug) }}
+          kicker="პროექტი"
+          title={activeProject.title}
+          description={activeProject.description || undefined}
+          meta={[
+            ...(activeProject.year ? [{ label: 'წელი', value: String(activeProject.year) }] : []),
+            ...(activeProject.tools.length ? [{ label: 'ინსტრუმენტები', value: activeProject.tools.join(', ') }] : []),
+            ...(activeProject.tags.length ? [{ label: 'მიმართულება', value: activeProject.tags.join(', ') }] : []),
+            { label: 'ფოტო', value: String(activeProject.images.length) },
+          ]}
+        />
 
-              <div className="flex max-w-4xl flex-col gap-5">
-                <span className="eyebrow">
-                  <span className="eyebrow-dot" />
-                  ბრენდინგის პროექტი
-                </span>
-                <h1 className="section-title">{activeProject.title}</h1>
-                <p className="section-subtitle max-w-3xl">
-                  {activeProject.description || `${activeProject.images.length} ნამუშევარი ერთ პროექტში`}
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {activeProject.year && (
-                    <span className="tag-chip px-3 py-1.5">{activeProject.year}</span>
-                  )}
-                  {activeProject.tools.map((tool) => (
-                    <span key={tool} className="tag-chip px-3 py-1.5">{tool}</span>
-                  ))}
-                  {activeProject.tags.map((tag) => (
-                    <span key={tag} className="tag-chip px-3 py-1.5">{tag}</span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        <section className="px-4 pb-24 sm:px-8">
+        <section className="px-[var(--section-space-x)] pb-24">
           {activeProject.images.length > 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-              className="mx-auto w-full max-w-[1180px] overflow-hidden bg-white shadow-[var(--brand-shadow)]"
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="mx-auto w-full max-w-[1180px] overflow-hidden rounded-[var(--radius-card)] bg-white"
               aria-label={`${activeProject.title} — პროექტის ნამუშევრები`}
             >
               {activeProject.images.map((item, index) => (
@@ -282,11 +298,8 @@ export default function PortfolioCatalogPage() {
               ))}
             </motion.div>
           ) : (
-            <div className="container-xl px-5 sm:px-8">
-              <div className="surface-card flex flex-col items-center gap-4 p-10 text-center text-[var(--brand-muted)]">
-                <ImageIcon className="h-5 w-5 text-[var(--brand-accent)]" />
-                <p>ამ პროექტში ფოტოები ჯერ არ არის.</p>
-              </div>
+            <div className="container-xl">
+              <p className="border-t border-[var(--brand-line)] py-16 text-[var(--brand-muted)]">ამ პროექტში ფოტოები ჯერ არ არის.</p>
             </div>
           )}
         </section>
@@ -296,43 +309,17 @@ export default function PortfolioCatalogPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="content-layer outline-none">
-      <section className="section-wrap pb-10">
-        <div className="container-xl">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="flex min-h-[270px] flex-col justify-end gap-7 border-b border-[var(--brand-line)] pb-10 pt-20"
-          >
-            <button
-              type="button"
-              onClick={() => navigateWithinSite('/#projects')}
-              className="button-secondary w-fit gap-2 text-xs"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              უკან დაბრუნება
-            </button>
+      <CatalogHeader
+        back={{ label: 'მთავარი გვერდი', onClick: () => navigateWithinSite('/#projects') }}
+        kicker="ნამუშევრების კატალოგი"
+        title={selectedCategory === 'all' ? 'ყველა ნამუშევარი' : activeCategory.label}
+        description={activeCategory.description}
+      />
 
-            <div className="flex max-w-4xl flex-col gap-5">
-              <span className="eyebrow">
-                <span className="eyebrow-dot" />
-                ნამუშევრების კატალოგი
-              </span>
-              <h1 className="section-title">
-                {selectedCategory === 'all' ? 'ფოტოების კატალოგი' : activeCategory.label}
-              </h1>
-              <p className="section-subtitle max-w-3xl">
-                {activeCategory.description}
-              </p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="px-5 pb-24 sm:px-8">
+      <section className="px-[var(--section-space-x)] pb-24">
         <div className="container-xl">
-          <div className="sticky top-[76px] z-30 -mx-5 mb-8 border-y border-[var(--brand-line)] bg-[var(--brand-header-surface)] px-5 py-4 backdrop-blur-xl sm:-mx-8 sm:px-8">
-            <div className="container-xl flex gap-2 overflow-x-auto pb-1">
+          <nav className="catalog-filter" aria-label="კატეგორიები">
+            <div className="catalog-filter-track">
               {categories.map((category) => {
                 const isActive = selectedCategory === category.id;
 
@@ -342,30 +329,27 @@ export default function PortfolioCatalogPage() {
                     type="button"
                     onClick={() => navigateToCategory(category.id, category.slug)}
                     aria-pressed={isActive}
-                    className={`shrink-0 rounded-full px-4 py-2 font-mono text-xs font-bold transition-all duration-200 ${
-                      isActive
-                        ? 'bg-[var(--brand-accent)] text-[var(--brand-on-accent)] shadow-[var(--brand-accent-shadow-sm)]'
-                        : 'border border-[var(--brand-line)] bg-white/58 text-[var(--brand-muted)] hover:bg-white hover:text-[var(--brand-ink)]'
-                    }`}
+                    className="catalog-filter-item"
                   >
                     {category.label}
-                    <span className="ml-2 opacity-70">{getCategoryCount(category, items)}</span>
+                    <sup>{getCategoryCount(category, items)}</sup>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </nav>
 
           {visibleItems.length > 0 && (
-            <motion.div layout className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <motion.div layout className="catalog-grid grid grid-cols-2 items-start gap-[clamp(12px,1.6vw,24px)] sm:grid-cols-3 lg:grid-cols-4">
               <AnimatePresence mode="popLayout">
-                {visibleItems.map((item) => (
+                {visibleItems.map((item, index) => (
                   <PortfolioCard
                     key={item.id}
                     item={item}
                     onOpen={handleOpenItem}
                     onImageError={useSupabaseSource ? handleImageError : undefined}
                     imageOnly
+                    index={index}
                   />
                 ))}
               </AnimatePresence>
@@ -373,12 +357,9 @@ export default function PortfolioCatalogPage() {
           )}
 
           {visibleItems.length === 0 && (
-            <div className="surface-card mt-4 flex flex-col items-center gap-4 p-10 text-center text-[var(--brand-muted)]">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
-                <ImageIcon className="h-5 w-5" />
-              </span>
-              <p>ამ კატეგორიაში ნამუშევარი ჯერ არ არის.</p>
-            </div>
+            <p className="border-t border-[var(--brand-line)] py-16 text-[var(--brand-muted)]">
+              ამ კატეგორიაში ნამუშევარი ჯერ არ არის.
+            </p>
           )}
         </div>
       </section>
