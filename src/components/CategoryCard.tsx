@@ -6,26 +6,34 @@
 import { useId } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 
-export type CategoryCardKind = 'posters' | 'branding' | 'billboards';
+/** The three original categories have their own artwork; any category added later uses "other". */
+export type CategoryCardKind = 'posters' | 'branding' | 'billboards' | 'other';
 
 const CREAM = '#f2efe9';
 const MINT = '#9fcbb8';
 
-export const CATEGORY_CARD_LABELS: Record<CategoryCardKind, string> = {
+export const CATEGORY_CARD_LABELS: Record<Exclude<CategoryCardKind, 'other'>, string> = {
   posters: 'პოსტერები',
   branding: 'ბრენდინგი',
   billboards: 'ბილბორდები',
 };
 
 export const categoryCardKind = (categoryId: string): CategoryCardKind =>
-  categoryId === 'branding' ? 'branding' : categoryId === 'billboards-print' ? 'billboards' : 'posters';
+  categoryId === 'product-posters' ? 'posters'
+    : categoryId === 'branding' ? 'branding'
+      : categoryId === 'billboards-print' ? 'billboards'
+        : 'other';
 
 /** Lettering size and tilt per word, tuned so each sits inside its hand-drawn marks. */
 const WORD_STYLE: Record<CategoryCardKind, { size: string; rotate: string; top: string }> = {
   posters: { size: '16.5cqw', rotate: '-4deg', top: '49%' },
   branding: { size: '13.5cqw', rotate: '-2.5deg', top: '50%' },
   billboards: { size: '10.5cqw', rotate: '-1.5deg', top: '48%' },
+  other: { size: '14cqw', rotate: '-3deg', top: '49%' },
 };
+
+/** A category's own name, sized to fit the card whatever its length. */
+const otherWordSize = (word: string) => `${Math.max(7, Math.min(16, 130 / Math.max(1, word.length)))}cqw`;
 
 const line = {
   fill: 'none',
@@ -36,7 +44,7 @@ const line = {
 
 /** Hand-drawn marks (viewBox 0 0 200 200); each path draws itself in, staggered by --d. */
 function Marks({ kind }: { kind: CategoryCardKind }) {
-  if (kind === 'posters') {
+  if (kind === 'posters' || kind === 'other') {
     return (
       <g className="cc-draw">
         <path {...line} style={{ ['--d' as string]: '0.45s' }} stroke={CREAM} strokeWidth={2.2} d="M50 129 C 64 122, 78 135, 94 128 S 124 120, 139 127 S 151 131, 155 127" />
@@ -77,6 +85,7 @@ export default function CategoryCard({
   kind,
   index,
   countLabel,
+  label = '',
   drawn = true,
   radius = 22,
   className = '',
@@ -84,12 +93,15 @@ export default function CategoryCard({
   kind: CategoryCardKind;
   index: number;
   countLabel: string;
+  /** The category's name, lettered on cards of kind "other". */
+  label?: string;
   drawn?: boolean;
   radius?: number;
   className?: string;
 }) {
   const uid = useId().replace(/:/g, '');
-  const word = WORD_STYLE[kind];
+  const text = kind === 'other' ? label : CATEGORY_CARD_LABELS[kind];
+  const word = kind === 'other' ? { ...WORD_STYLE.other, size: otherWordSize(text) } : WORD_STYLE[kind];
 
   return (
     <span
@@ -123,7 +135,7 @@ export default function CategoryCard({
         className="cc-word"
         style={{ top: word.top, fontSize: word.size, ['--r' as string]: word.rotate }}
       >
-        {CATEGORY_CARD_LABELS[kind]}
+        {text}
       </span>
 
       <span className="cc-meta cc-meta-bottom">

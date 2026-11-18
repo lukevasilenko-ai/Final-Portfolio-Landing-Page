@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { ALL_PORTFOLIO_CATEGORY, PORTFOLIO_CATEGORIES } from './portfolioItems';
 import type { PortfolioCategory, PortfolioItem, PortfolioItemCategory, PortfolioProject } from '../types';
+import { summarizeCategories, type CategorySummary, type SummaryCategoryRow, type SummaryProjectRow } from './categorySummary';
 
 type CategoryRow = {
   id: string;
@@ -240,6 +241,32 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
     items: mapped.map(({ item }) => item),
     projects: mapped.map(({ project }) => project),
   };
+}
+
+/**
+ * Light query for the home page's category list: active categories (in their admin order) and
+ * the number of published works in each. No image links are signed, so it stays quick.
+ */
+export async function loadCategorySummaries(): Promise<CategorySummary[]> {
+  const client = supabase;
+  if (!client) throw new Error('Supabase-ის კავშირი გამართული არ არის.');
+  const [categoryResult, projectResult] = await Promise.all([
+    client.from('portfolio_categories')
+      .select('id, slug, name')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('slug', { ascending: true }),
+    client.from('portfolio_projects')
+      .select('category_id, presentation_type')
+      .is('deleted_at', null)
+      .eq('is_published', true)
+      .not('cover_image_path', 'is', null),
+  ]);
+  if (categoryResult.error || projectResult.error) throw new Error('კატეგორიების ჩატვირთვა ვერ მოხერხდა.');
+  return summarizeCategories(
+    (categoryResult.data ?? []) as SummaryCategoryRow[],
+    (projectResult.data ?? []) as SummaryProjectRow[],
+  );
 }
 
 export async function refreshSupabaseImageUrl(path: string) {

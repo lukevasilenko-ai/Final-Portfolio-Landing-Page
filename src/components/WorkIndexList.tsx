@@ -3,26 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowUpRight } from 'lucide-react';
-import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
-import { getPortfolioCategoryCount } from '../data/catalogImages';
+import { useHomeCategories, type HomeCategory } from '../data/homeCategories';
 import { navigateWithinSite } from '../navigation';
-import CategoryCard, { categoryCardKind } from './CategoryCard';
+import CategoryCard, { categoryCardKind, type CategoryCardKind } from './CategoryCard';
 import { EditableLabel, useEditable } from '../websiteSections/EditableText';
 
-const countLabel = (categoryId: string) => {
-  const count = getPortfolioCategoryCount(categoryId);
-  return categoryId === 'branding' ? `${count} პროექტი` : `${count} ფოტო`;
-};
-
-const ROWS = PORTFOLIO_CATEGORIES.map((category, index) => ({
-  category,
-  index,
-  kind: categoryCardKind(category.id),
-  count: countLabel(category.id),
-}));
+interface Row {
+  category: HomeCategory;
+  index: number;
+  kind: CategoryCardKind;
+  count: string;
+}
 
 /** Each row's card leans a different way, so moving down the list feels hand-placed. */
 const TILTS = ['-4deg', '3deg', '-2deg'];
@@ -30,9 +24,8 @@ const TILTS = ['-4deg', '3deg', '-2deg'];
 /**
  * Portfolio category index. On hover (fine pointers, ≥768px) a brand-green card opens from
  * the row with a mask reveal while its lettering writes itself in; touch screens get a small
- * inline card instead.
+ * inline card instead. The categories and their counts follow the admin (see homeCategories).
  */
-type Row = typeof ROWS[number];
 
 /** One category row; in the visual editor its name can be changed and the row hidden. */
 function IndexRow({ row, active, setActive }: { row: Row; active: number | null; setActive: (index: number | null) => void }) {
@@ -59,7 +52,7 @@ function IndexRow({ row, active, setActive }: { row: Row; active: number | null;
             <span className="work-index-num">{String(row.index + 1).padStart(2, '0')}</span>
             <span className="flex min-w-0 items-center gap-5">
               <span className="work-index-thumb" aria-hidden="true">
-                <CategoryCard kind={row.kind} index={row.index} countLabel={row.count} radius={10} />
+                <CategoryCard kind={row.kind} index={row.index} countLabel={row.count} label={row.category.label} radius={10} />
               </span>
               <span className="work-index-title min-w-0 break-words"><EditableLabel id={id} fallback={row.category.label} /></span>
             </span>
@@ -74,7 +67,7 @@ function IndexRow({ row, active, setActive }: { row: Row; active: number | null;
             >
               <span className="wp-reveal-mask block">
                 <span className="wp-reveal-inner block">
-                  <CategoryCard kind={row.kind} index={row.index} countLabel={row.count} drawn={active === row.index} radius={0} />
+                  <CategoryCard kind={row.kind} index={row.index} countLabel={row.count} label={row.category.label} drawn={active === row.index} radius={0} />
                 </span>
               </span>
             </span>
@@ -85,10 +78,17 @@ function IndexRow({ row, active, setActive }: { row: Row; active: number | null;
 
 export default function WorkIndexList() {
   const [active, setActive] = useState<number | null>(null);
+  const categories = useHomeCategories();
+  const rows = useMemo<Row[]>(() => categories.map((category, index) => ({
+    category,
+    index,
+    kind: categoryCardKind(category.id),
+    count: category.countLabel,
+  })), [categories]);
 
   return (
     <ul onPointerLeave={() => setActive(null)}>
-      {ROWS.map((row) => <Fragment key={row.category.id}><IndexRow row={row} active={active} setActive={setActive} /></Fragment>)}
+      {rows.map((row) => <Fragment key={row.category.id}><IndexRow row={row} active={active} setActive={setActive} /></Fragment>)}
     </ul>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import { ArrowRight } from 'lucide-react';
-import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
+import { useHomeCategories } from '../data/homeCategories';
 import { navigateWithinSite } from '../navigation';
 import { websiteCopy, type WebsiteCopy } from '../websiteSections/copy';
 import { NativeElementSlot } from '../websiteSections/NativeElements';
@@ -16,6 +16,7 @@ import WorkIndexList from './WorkIndexList';
 export default function Projects({ content }: { content?: WebsiteCopy }) {
   const catalogButton = useEditable('projects.catalog-button', 'button', 'კატალოგის ღილაკი', ['hide', 'href']);
   const count = useEditable('projects.count', 'item', 'კატეგორიების რაოდენობა');
+  const categoryCount = useHomeCategories().length;
   const catalogHref = catalogButton.href('/portfolio');
   return (
     <section id="projects" className="section-wrap ed-section">
@@ -44,7 +45,7 @@ export default function Projects({ content }: { content?: WebsiteCopy }) {
           <NativeElementSlot id="projects.category-label"><span className="ed-kicker">
             <span data-website-editor-inline-field="categoryLabel">{websiteCopy(content, 'categoryLabel', 'ყველა კატეგორია')}</span>
           </span></NativeElementSlot>
-          {!count.gone && <span {...count.attrs} className="ed-kicker tabular-nums">{String(PORTFOLIO_CATEGORIES.length).padStart(2, '0')}</span>}
+          {!count.gone && <span {...count.attrs} className="ed-kicker tabular-nums">{String(categoryCount).padStart(2, '0')}</span>}
         </div>
 
         <NativeElementSlot id="projects.category-cards"><WorkIndexList /></NativeElementSlot>
