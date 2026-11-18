@@ -282,7 +282,7 @@ export default function PortfolioModal({
                       aria-label={`სურათი ${position + 1}`}
                       onClick={() => onSelect(candidate)}
                     >
-                      <img src={candidate.image} alt="" loading="lazy" decoding="async" />
+                      <img src={candidate.thumbnail ?? candidate.image} alt="" loading="lazy" decoding="async" />
                     </button>
                   ))}
                 </motion.div>

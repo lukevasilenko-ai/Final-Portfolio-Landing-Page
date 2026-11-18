@@ -6,24 +6,24 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { PORTFOLIO_ITEMS } from '../data/catalogImages';
 import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
-import { loadStripWorks, type StripWork } from '../data/stripWorks';
+import { loadStripWorks, usePosterWorks, type StripWork } from '../data/stripWorks';
 import { navigateWithinSite } from '../navigation';
 import { useWebsiteEditorRuntime } from '../websiteSections/EditorRuntime';
 import { useSiteElements } from '../SiteProfileContext';
 
-// Square (1:1) product posters only, lighter files first so the first screen stays fast.
-// Any bundled image that turns out not to be square is hidden at runtime (see onLoad below).
+// Bundled fallback (local preview, or if the live catalogue can't be read): square product
+// posters, lighter files first so the first screen stays fast.
 const SQUARE_POSTERS = ['15_result', '2_result', '9_result', '1_result', '14_result', '16_result', '11_result', '5(2)', '3_result', '13_result', '6(1)', '18_result', '8_result'];
 
 const PIXELS_PER_SECOND = 28;
+/** Empty tiles shown for the moment the live list is loading. */
+const PLACEHOLDERS = 8;
 
 interface StripItem {
   key: string;
   src: string;
   href: string;
   label: string;
-  /** Bundled defaults are checked for squareness; works chosen in the editor are always shown. */
-  checkSquare: boolean;
 }
 
 const fileBase = (filename?: string) => (filename ?? '').replace(/\.[^.]+$/, '');
@@ -37,8 +37,20 @@ export const STATIC_STRIP_POSTERS = PORTFOLIO_ITEMS
 
 export const DEFAULT_STRIP_KEYS = SQUARE_POSTERS.map((name) => `static:${name}`);
 
-const isSquare = (image: HTMLImageElement) =>
-  image.naturalWidth > 0 && Math.abs(image.naturalWidth / image.naturalHeight - 1) < 0.02;
+/**
+ * What the strip shows when nothing was chosen in the editor: the live posters category (every
+ * published poster, in the admin's order), or the bundled set where that isn't available.
+ * `loading` is true while the live list is on its way.
+ */
+export function useDefaultStripKeys() {
+  const posters = usePosterWorks();
+  const keys = useMemo(
+    () => (posters.works?.length ? posters.works.map((work) => `work:${work.id}`) : DEFAULT_STRIP_KEYS),
+    [posters.works],
+  );
+  const works = useMemo(() => new Map((posters.works ?? []).map((work) => [work.id, work])), [posters.works]);
+  return { keys, works, loading: posters.loading };
+}
 
 /** The poster image as a CSS variable, for the coloured glow drawn behind it in site.css. */
 export const posterStyle = (src: string) => ({ '--poster': `url(${JSON.stringify(src)})` }) as CSSProperties;
@@ -60,21 +72,28 @@ function followPointer(event: ReactPointerEvent<HTMLElement>) {
  * out of the slope in its real colours, leans in 3D after the pointer with a soft light on it
  * and a glow of its own colours behind it (site.css). It eases back when the pointer leaves,
  * pauses while off screen, and stays still for reduced-motion users. `lead(copy)` renders
- * first (the editable hero artwork); the set is drawn twice for a seamless loop. Which posters
- * appear can be changed in the admin's visual editor.
+ * first (the editable hero artwork); the set is drawn twice for a seamless loop. By default it
+ * shows the posters category as it is in the admin (new uploads appear on their own); a fixed
+ * selection can be made in the admin's visual editor instead. Posters keep their own shape.
  */
 export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNode }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const holdRef = useRef(false);
-  const [notSquare, setNotSquare] = useState<ReadonlySet<string>>(() => new Set());
+  // Each poster keeps its own shape (width ÷ height, read once it loads); all are the same height.
+  const [ratios, setRatios] = useState<ReadonlyMap<string, number>>(() => new Map());
   const [works, setWorks] = useState<Map<string, StripWork>>(() => new Map());
   // Inside the admin's visual editor the strip stands still, so nothing moves under the cursor.
   const { enabled: editing } = useWebsiteEditorRuntime();
   const elements = useSiteElements();
-  const keys = elements.strip ?? DEFAULT_STRIP_KEYS;
+  const fallback = useDefaultStripKeys();
+  const keys = elements.strip ?? fallback.keys;
+  const waiting = !elements.strip && fallback.loading;
 
-  const workIds = useMemo(() => keys.filter((key) => key.startsWith('work:')).map((key) => key.slice(5)), [keys]);
+  const workIds = useMemo(
+    () => keys.filter((key) => key.startsWith('work:') && !fallback.works.has(key.slice(5))).map((key) => key.slice(5)),
+    [keys, fallback.works],
+  );
   useEffect(() => {
     if (!workIds.length) return;
     let active = true;
@@ -82,15 +101,18 @@ export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNod
     return () => { active = false; };
   }, [workIds]);
 
-  // `slot` is the position in the saved list, which the editor uses to move/replace/remove.
+  // `slot` is the position in the list, which the editor uses to move/replace/remove.
   const items = useMemo(() => keys.flatMap((key, slot): (StripItem & { slot: number })[] => {
     if (key.startsWith('static:')) {
       const poster = STATIC_STRIP_POSTERS.find((item) => item.key === key);
-      return poster ? [{ key, slot, src: poster.src, href: postersHref, label: poster.label, checkSquare: true }] : [];
+      return poster ? [{ key, slot, src: poster.src, href: postersHref, label: poster.label }] : [];
     }
-    const work = works.get(key.slice(5));
-    return work ? [{ key, slot, src: work.url, href: '/portfolio', label: work.title, checkSquare: false }] : [];
-  }), [keys, works]);
+    const id = key.slice(5);
+    const poster = fallback.works.get(id);
+    const work = poster ?? works.get(id);
+    // A poster opens its category; a work picked from elsewhere opens the full catalogue.
+    return work ? [{ key, slot, src: work.url, href: poster ? postersHref : '/portfolio', label: work.title }] : [];
+  }), [keys, works, fallback.works]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -137,16 +159,48 @@ export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNod
     };
   }, [editing]);
 
-  const markNotSquare = (key: string, image: HTMLImageElement) => {
-    if (isSquare(image)) return;
-    setNotSquare((current) => (current.has(key) ? current : new Set(current).add(key)));
+  // Pictures load only as they come near the visible part of the strip (the browser's own lazy
+  // loading doesn't hold back inside a moving, clipped row, and posters can be large files).
+  const [near, setNear] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setNear(new Set(items.map((item) => item.key)));
+      return undefined;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      const keys = entries
+        .filter((entry) => entry.isIntersecting)
+        .map((entry) => (entry.target as HTMLElement).dataset.stripKey)
+        .filter((key): key is string => Boolean(key));
+      if (!keys.length) return;
+      setNear((current) => {
+        if (keys.every((key) => current.has(key))) return current;
+        const next = new Set(current);
+        keys.forEach((key) => next.add(key));
+        return next;
+      });
+    }, { root: viewport, rootMargin: '0px 480px' });
+    viewport.querySelectorAll<HTMLElement>('[data-strip-key]').forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [items]);
+
+  const noteRatio = (key: string, image: HTMLImageElement) => {
+    if (!image.naturalWidth || !image.naturalHeight) return;
+    // Within 2% of square counts as square; anything else between portrait 1:2 and landscape 2:1.
+    const raw = image.naturalWidth / image.naturalHeight;
+    const ratio = Math.abs(raw - 1) < 0.02 ? 1 : Math.max(0.5, Math.min(2, raw));
+    setRatios((current) => (current.get(key) === ratio ? current : new Map(current).set(key, ratio)));
   };
 
   const renderSet = (copy: boolean) => (
     <div className="work-strip-set" aria-hidden={copy || undefined}>
       {lead?.(copy)}
+      {waiting && Array.from({ length: PLACEHOLDERS }, (_, index) => (
+        <span key={`wait-${index}`} className="work-strip-item is-placeholder" aria-hidden="true" />
+      ))}
       {items.map((item) => {
-        if (item.checkSquare && notSquare.has(item.key)) return null;
         // Only the first copy of the loop is editable; the editor needs the item's position.
         const editAttrs = editing && !copy ? {
           'data-el': `hero.strip.${item.slot}`,
@@ -165,19 +219,22 @@ export default function WorkStrip({ lead }: { lead?: (copy: boolean) => ReactNod
               event.preventDefault();
               navigateWithinSite(item.href);
             }}
+            data-strip-key={item.key}
             className="work-strip-item"
-            style={posterStyle(item.src)}
+            style={{ ...(near.has(item.key) ? posterStyle(item.src) : {}), '--ratio': ratios.get(item.key) ?? 1 } as CSSProperties}
             aria-hidden={copy || undefined}
             tabIndex={copy ? -1 : undefined}
             aria-label={copy ? undefined : item.label}
           >
-            <img
-              src={item.src}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onLoad={(event) => { if (item.checkSquare) markNotSquare(item.key, event.currentTarget); }}
-            />
+            {near.has(item.key) && (
+              <img
+                src={item.src}
+                alt=""
+                decoding="async"
+                fetchPriority="low"
+                onLoad={(event) => noteRatio(item.key, event.currentTarget)}
+              />
+            )}
           </a>
         );
       })}

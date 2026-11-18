@@ -45,6 +45,8 @@ export interface PortfolioItem {
   serviceType?: string;
   industry?: string;
   image: string;
+  /** A light copy of `image` for small views (grid, filmstrip), when one exists. */
+  thumbnail?: string;
   imagePath?: string;
   categoryLabel?: string;
   description?: string;

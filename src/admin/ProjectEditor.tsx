@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { uploadThumbnail } from '../lib/imageThumbnail';
 import { getCategoryAdminLabel } from './labels';
 import { adminConfirm } from './feedback';
 
@@ -310,6 +311,8 @@ export default function ProjectEditor({ project, categories, onClose, onDraftCre
         upsert: false,
       });
     if (error) throw error;
+    // A light copy for the site's small views (if it fails, the site shows the original).
+    await uploadThumbnail(client, 'portfolio-images', path, file);
     return path;
   }
 

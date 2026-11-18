@@ -15,7 +15,8 @@ import {
   clearElementStyle, effectiveStyle, FONT_FAMILIES, setStyleValue, SHADOWS,
   type Breakpoint, type ElementStyle, type FontFamilyKey, type ShadowKey,
 } from '../siteElementStyles';
-import { DEFAULT_STRIP_KEYS, STATIC_STRIP_POSTERS } from '../components/WorkStrip';
+import { STATIC_STRIP_POSTERS, useDefaultStripKeys } from '../components/WorkStrip';
+import { isPhraseKey, PHRASE_FIELD_LABELS, phraseLine } from '../components/heroPhraseCopy';
 import { loadPickableWorks, uploadPosterWork, type PickableWork } from '../admin/works';
 import { adminToast } from '../admin/feedback';
 
@@ -149,7 +150,9 @@ function ContentTab({ element, layout, elements, breakpoint, onElements, onCopy,
   const [busy, setBusy] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
   const hidden = elements.hidden.includes(element.id);
-  const strip = elements.strip ?? DEFAULT_STRIP_KEYS;
+  // Same list the site shows when nothing was chosen here: the posters category (or the bundled set).
+  const defaultStrip = useDefaultStripKeys();
+  const strip = elements.strip ?? defaultStrip.keys;
   const stripIndex = element.stripIndex ?? -1;
   const setStrip = (next: string[]) => onElements({ ...elements, strip: next.slice(0, STRIP_LIMIT) });
   const moveStrip = (direction: -1 | 1) => {
@@ -280,12 +283,17 @@ function ContentTab({ element, layout, elements, breakpoint, onElements, onCopy,
         </Group>
       )}
 
-      {copyProps.map(({ sectionId: copySection, key }) => (
-        <Fragment key={`${copySection}.${key}`}><Group title={key === 'copyright' ? 'ტექსტი' : 'მინიშნება ველში'}>
-          <CopyField hint={key === 'copyright' ? '{year} ავტომატურად იცვლება მიმდინარე წლით.' : undefined}
-            value={copyValue(layout, copySection, key)} onCommit={(value) => onCopy(copySection, key, value)} />
-        </Group></Fragment>
-      ))}
+      {copyProps.map(({ sectionId: copySection, key }) => {
+        // The hero statement's lines show what the site shows (old defaults count as unset).
+        const phrase = isPhraseKey(key) ? PHRASE_FIELD_LABELS[key] : null;
+        const value = copyValue(layout, copySection, key);
+        return (
+          <Fragment key={`${copySection}.${key}`}><Group title={phrase?.title ?? (key === 'copyright' ? 'ტექსტი' : 'მინიშნება ველში')}>
+            <CopyField hint={phrase ? phrase.hint : key === 'copyright' ? '{year} ავტომატურად იცვლება მიმდინარე წლით.' : undefined}
+              value={phrase && isPhraseKey(key) ? phraseLine(key, value) : value} onCommit={(next) => onCopy(copySection, key, next)} />
+          </Group></Fragment>
+        );
+      })}
 
       {has('href') && <Group title="ბმული"><LinkField value={elements.href[element.id] ?? ''} onCommit={(value) => onElements(setElementHref(elements, element.id, value || null))} /></Group>}
 
@@ -370,6 +378,8 @@ function StyleTab({ element, elements, breakpoint, onBreakpoint, onElements }: {
   const isImage = element.kind === 'image' || element.kind === 'free-image';
   const isSection = element.kind === 'section';
   const isFree = element.props.includes('free');
+  // Free items and built-in movable pieces (the hero lettering) are placed by position and width.
+  const isMovable = isFree || element.props.includes('move');
 
   return (
     <div className="ve-group-list">
@@ -434,13 +444,13 @@ function StyleTab({ element, elements, breakpoint, onBreakpoint, onElements }: {
         </Field>
       </Group>
 
-      {isFree ? (
+      {isMovable ? (
         <Group title="ადგილი და ზომა">
           <div className="ve-grid-2">
             <NumberField label="მარცხნიდან (%)" value={own.posX} placeholder={current.posX} step={0.5} min={-100} max={200} onChange={(value) => set('posX', value)} />
             <NumberField label="ზემოდან (px)" value={own.posY} placeholder={current.posY} min={-2000} max={8000} onChange={(value) => set('posY', value)} />
             <NumberField label="სიგანე (%)" value={own.widthPct} placeholder={current.widthPct} step={0.5} min={1} max={300} onChange={(value) => set('widthPct', value)} />
-            {isImage
+            {isImage && !isFree ? null : isImage
               ? <NumberField label="სიმაღლე (px)" value={own.heightPx} placeholder={current.heightPx} min={8} max={4000} onChange={(value) => set('heightPx', value)} />
               : <NumberField label="შიგნით (px)" value={own.paddingY} min={0} max={400} onChange={(value) => onElements({
                 ...elements,
@@ -463,7 +473,7 @@ function StyleTab({ element, elements, breakpoint, onBreakpoint, onElements }: {
         </Group>
       )}
 
-      {!isSection && !isFree && (
+      {!isSection && !isMovable && (
         <Group title="პოზიცია">
           <div className="ve-grid-2">
             <NumberField label="← → (px)" value={own.x} min={-2000} max={2000} onChange={(value) => set('x', value)} />

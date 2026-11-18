@@ -61,6 +61,8 @@ const blockNames: Record<Exclude<WebsiteBlockType, 'native-visibility'>, string>
 };
 
 const FREE_GESTURE_KEYS = ['posX', 'posY', 'widthPct', 'heightPx', 'rotate'] as const satisfies readonly (keyof ElementStyle)[];
+/** Built-in pieces that can be dragged, sized and turned on the page like free items. */
+const MOVABLE_ELEMENT_IDS = new Set(['hero.lettering']);
 
 const insertable = WEBSITE_INSERTABLE_BLOCK_TYPES.filter((type) => type !== 'feature-list' && type !== 'content-group' && type !== 'call-to-action');
 const deviceWidths: Record<Device, number> = { desktop: 1360, tablet: 820, mobile: 390 };
@@ -241,10 +243,11 @@ export default function CanvasWebsiteEditor({ variant = 'full', elements = EMPTY
         return;
       }
       // A free item was dragged, sized, cropped or rotated on the page: store it for this screen size.
-      if (data?.type === 'luka-website-editor-free-change' && typeof data.id === 'string' && data.id.startsWith('free.')
+      if (data?.type === 'luka-website-editor-free-change' && typeof data.id === 'string'
+        && (data.id.startsWith('free.') || MOVABLE_ELEMENT_IDS.has(data.id))
         && data.values && typeof data.values === 'object') {
         const current = latestElements.current;
-        if (!current.free.some((item) => `free.${item.id}` === data.id)) return;
+        if (data.id.startsWith('free.') && !current.free.some((item) => `free.${item.id}` === data.id)) return;
         let style = current.style;
         for (const key of FREE_GESTURE_KEYS) {
           const value = (data.values as Record<string, unknown>)[key];

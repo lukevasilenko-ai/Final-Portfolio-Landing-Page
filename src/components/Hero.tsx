@@ -5,9 +5,11 @@
 
 import React, { Fragment, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowDown, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { HERO_ARTWORK } from '../data';
 import WorkStrip, { posterStyle } from './WorkStrip';
+import ExploreWorksButton from './WorksPortal';
+import HeroPhrase from './HeroPhrase';
 import { useSiteProfile } from '../SiteProfileContext';
 import { useSocialLinks, type SocialLink } from './socialLinks';
 import { followSiteLink, isExternalLink, navigateWithinSite } from '../navigation';
@@ -59,7 +61,7 @@ function HeroArtwork({ copy, content }: { copy: boolean; content?: WebsiteCopy }
   return copy ? artwork : <NativeElementSlot id="hero.artwork">{artwork}</NativeElementSlot>;
 }
 
-export default function Hero({ content, primaryTarget = 'projects' }: { content?: WebsiteCopy; primaryTarget?: string }) {
+export default function Hero({ content }: { content?: WebsiteCopy; primaryTarget?: string }) {
   const [time, setTime] = useState(() => new Date());
   const profile = useSiteProfile();
   const socialLinks = useSocialLinks();
@@ -74,7 +76,8 @@ export default function Hero({ content, primaryTarget = 'projects' }: { content?
     return () => clearInterval(timer);
   }, []);
 
-  const ctaHref = cta.href(`#${primaryTarget}`);
+  // The works button opens the full catalogue (all works) unless a different link was set in the editor.
+  const ctaHref = cta.href('/portfolio');
   const catalogHref = catalogLink.href('/portfolio');
   const handleLink = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (followSiteLink(href)) event.preventDefault();
@@ -105,18 +108,33 @@ export default function Hero({ content, primaryTarget = 'projects' }: { content?
             </span>
           </motion.div>
 
-          <NativeElementSlot id="hero.title"><motion.h1
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease, delay: 0.12 }}
-            className="hero-display mt-10 md:mt-14"
-          >
-            <span className="block"><EditableText field="titleLine1">{websiteCopy(content, 'titleLine1', 'ესთეტიკა,')}</EditableText></span>
-            <span className="block">
-              <EditableText field="titleLine2">{websiteCopy(content, 'titleLine2', 'იდეა და ხასიათი')}</EditableText>{' '}
-              <span className="hero-script whitespace-nowrap"><EditableText field="titleLine3">{websiteCopy(content, 'titleLine3', 'ერთ დიზაინში')}</EditableText></span>
-            </span>
-          </motion.h1></NativeElementSlot>
+          {/* The statement on the left (it animates itself in); the works button and social links
+              beside it (below on phones). */}
+          <div className="mt-8 grid grid-cols-1 items-center gap-8 md:mb-10 md:mt-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12">
+            <NativeElementSlot id="hero.title"><h1 className="hero-phrase-stage">
+              <HeroPhrase content={content} />
+            </h1></NativeElementSlot>
+
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9, ease, delay: 0.3 }}
+              className="flex flex-wrap items-center gap-5 lg:flex-col lg:gap-6"
+            >
+              {!cta.gone && <NativeElementSlot id="hero.primary-action"><ExploreWorksButton
+                attrs={cta.attrs}
+                href={ctaHref}
+                editing={cta.editing}
+                plainLabel={websiteCopy(content, 'primaryButtonLabel', 'ნამუშევრების დათვალიერება')}
+              >
+                <EditableText field="primaryButtonLabel">{websiteCopy(content, 'primaryButtonLabel', 'ნამუშევრების დათვალიერება')}</EditableText>
+              </ExploreWorksButton></NativeElementSlot>}
+
+              <NativeElementSlot id="hero.social-links"><div className="flex items-center gap-2">
+                {socialLinks.map((link) => <Fragment key={link.key}><SocialIcon link={link} scope="hero" className="icon-button h-11 w-11" /></Fragment>)}
+              </div></NativeElementSlot>
+            </motion.div>
+          </div>
         </div>
       </div>
 
@@ -148,42 +166,6 @@ export default function Hero({ content, primaryTarget = 'projects' }: { content?
         </div>
         <WorkStrip lead={(copy) => <HeroArtwork copy={copy} content={content} />} />
       </motion.div>
-
-      <div className="order-3 mt-10 px-[var(--section-space-x)] md:order-2 md:mb-14 md:mt-12">
-        <div className="container-xl ed-grid gap-y-8">
-          <NativeElementSlot id="hero.description"><motion.p
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, ease, delay: 0.24 }}
-            className="lead-copy col-span-12 max-w-[60ch] text-[16px] lg:col-span-6 lg:col-start-4"
-          >
-            <EditableText field="description">{websiteCopy(content, 'description', 'გამარჯობა, მე ვარ ლუკა ვასილენკო. მე ვქმნი თვალშისაცემ ვიზუალურ პროდუქტებს, სადაც კრეატიული იდეები და ვიზუალური მინიმალიზმი ერთმანეთს ერწყმის. სპეციალიზებული ვარ სოც. მედია პოსტერების, ლოგოების, ბანერების, სავიზიტო ბარათების, ბრენდინგისა და რებრენდინგის მიმართულებით. ვმუშაობ Adobe Photoshop-სა და Adobe Illustrator-ში.')}</EditableText>
-          </motion.p></NativeElementSlot>
-
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, ease, delay: 0.32 }}
-            className="col-span-12 flex flex-wrap items-center gap-3 lg:col-span-3 lg:col-start-10 lg:flex-col lg:items-end lg:justify-end"
-          >
-            {!cta.gone && <NativeElementSlot id="hero.primary-action"><a
-              {...cta.attrs}
-              href={ctaHref}
-              onClick={handleLink(ctaHref)}
-              target={isExternalLink(ctaHref) ? '_blank' : undefined}
-              rel={isExternalLink(ctaHref) ? 'noreferrer' : undefined}
-              className="button-primary"
-            >
-              <EditableText field="primaryButtonLabel">{websiteCopy(content, 'primaryButtonLabel', 'ნამუშევრების დათვალიერება')}</EditableText>
-              <ArrowDown className="h-4 w-4" />
-            </a></NativeElementSlot>}
-
-            <NativeElementSlot id="hero.social-links"><div className="flex items-center gap-2">
-              {socialLinks.map((link) => <Fragment key={link.key}><SocialIcon link={link} scope="hero" className="icon-button h-11 w-11" /></Fragment>)}
-            </div></NativeElementSlot>
-          </motion.div>
-        </div>
-      </div>
     </section>
   );
 }

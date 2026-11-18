@@ -20,7 +20,7 @@ const copyOnly: WebsiteBlockType[] = [];
 const definitions: Record<NativeSectionKey, NativeElementDefinition[]> = {
   hero: [
     { id: 'hero.eyebrow', label: 'მცირე წარწერა', description: 'მთავარი სათაურის ზემოთ', copyKeys: ['eyebrow'], canHide: true, allowedInsertions: textAndMedia },
-    { id: 'hero.title', label: 'მთავარი სათაური', description: 'სამნაწილიანი მთავარი სათაური', copyKeys: ['titleLine1', 'titleLine2', 'titleLine3'], canHide: true, allowedInsertions: textOnly },
+    { id: 'hero.title', label: 'მთავარი ფრაზა', description: 'ორი სტრიქონი და ცვალებადი სიტყვები („/“-ით)', copyKeys: ['titleLine1', 'titleLine2', 'titleLine3'], canHide: true, allowedInsertions: textOnly },
     { id: 'hero.description', label: 'აღწერა', description: 'მთავარი გვერდის შესავალი ტექსტი', copyKeys: ['description'], canHide: true, allowedInsertions: textAndMedia },
     { id: 'hero.primary-action', label: 'მთავარი ღილაკი', description: 'კატალოგზე გადასვლის ღილაკი', copyKeys: ['primaryButtonLabel'], canHide: true, allowedInsertions: ['button', 'eyebrow', 'paragraph'] },
     { id: 'hero.artwork', label: 'მთავარი ნამუშევარი', description: 'პორტფოლიოს სურათი', copyKeys: ['heroImageSrc', 'imageAlt'], canHide: false, allowedInsertions: ['image', 'gallery-item', 'eyebrow', 'paragraph'] },

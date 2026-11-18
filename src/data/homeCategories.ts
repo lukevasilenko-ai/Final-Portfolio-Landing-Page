@@ -13,6 +13,7 @@ export interface HomeCategory {
   id: string;
   slug: string;
   label: string;
+  count: number;
   countLabel: string;
 }
 
@@ -20,6 +21,7 @@ const BUNDLED: HomeCategory[] = PORTFOLIO_CATEGORIES.map((category) => ({
   id: category.id,
   slug: category.slug,
   label: category.label,
+  count: getPortfolioCategoryCount(category.id),
   countLabel: categoryCountLabel(getPortfolioCategoryCount(category.id), category.id === 'branding' ? 'project' : 'photo'),
 }));
 
@@ -33,7 +35,7 @@ function loadLive() {
     .then((list) => {
       cached = list
         .filter((category) => category.count > 0)
-        .map((category) => ({ id: category.id, slug: category.slug, label: category.label, countLabel: categoryCountLabel(category.count, category.unit) }));
+        .map((category) => ({ id: category.id, slug: category.slug, label: category.label, count: category.count, countLabel: categoryCountLabel(category.count, category.unit) }));
       return cached;
     })
     .catch((error: unknown) => {

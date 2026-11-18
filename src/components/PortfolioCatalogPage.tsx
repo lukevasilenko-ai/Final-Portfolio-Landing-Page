@@ -174,11 +174,12 @@ export default function PortfolioCatalogPage() {
     const signedUrl = await refreshSupabaseImageUrl(path);
     setRemoteCatalog((current) => current ? {
       ...current,
-      items: current.items.map((item) => item.imagePath === path ? { ...item, image: signedUrl } : item),
+      // A refreshed image drops its light copy, so the fresh link to the original is what shows.
+      items: current.items.map((item) => item.imagePath === path ? { ...item, image: signedUrl, thumbnail: undefined } : item),
       projects: current.projects.map((project) => ({
         ...project,
         cover: project.coverPath === path ? signedUrl : project.cover,
-        images: project.images.map((item) => item.imagePath === path ? { ...item, image: signedUrl } : item),
+        images: project.images.map((item) => item.imagePath === path ? { ...item, image: signedUrl, thumbnail: undefined } : item),
       })),
     } : current);
     return signedUrl;

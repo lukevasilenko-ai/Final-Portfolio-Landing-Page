@@ -335,7 +335,7 @@ export default function App() {
         }
         // A free item is selected by the first click (so it can be dragged); clicking the
         // selected free text again starts typing.
-        const freeItem = event.target.closest<HTMLElement>('.site-free-item[data-edit-id]');
+        const freeItem = event.target.closest<HTMLElement>(MOVABLE_SELECTOR);
         if (freeItem) {
           const freeText = freeItem.querySelector<HTMLElement>(':scope > [data-edit-text]');
           if (freeText && lastEditElement.current === freeItem.dataset.editId && !event.target.closest('[data-free-handle]')) startLabelEdit(freeText, point);
@@ -491,12 +491,15 @@ export default function App() {
       const set = (property: string, value: string) => gesture.item.style.setProperty(property, value, 'important');
       const percent = (px: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(px / gesture.boxWidth * 10000) / 100));
       const pixels = (px: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(px)));
+      const layerBox = gesture.item.offsetParent instanceof HTMLElement ? gesture.item.offsetParent : null;
       if (gesture.mode === 'move') {
-        gesture.values = { posX: percent(gesture.left + dx, -100, 200), posY: pixels(gesture.top + dy, -2000, 8000) };
+        const bounded = layerBox ? keepInBounds(gesture.item, layerBox, gesture.left + dx, gesture.top + dy, gesture.width) : { left: gesture.left + dx, top: gesture.top + dy };
+        gesture.values = { posX: percent(bounded.left, -100, 200), posY: pixels(bounded.top, -2000, 8000) };
         set('left', `${gesture.values.posX}%`);
         set('top', `${gesture.values.posY}px`);
       } else if (gesture.mode === 'resize') {
-        gesture.values = { widthPct: percent(Math.max(12, gesture.width + dx), 1, 300) };
+        const bounded = layerBox ? keepInBounds(gesture.item, layerBox, gesture.left, gesture.top, Math.max(12, gesture.width + dx)) : { width: Math.max(12, gesture.width + dx) };
+        gesture.values = { widthPct: percent(bounded.width, 1, 300) };
         set('width', `${gesture.values.widthPct}%`);
         if (gesture.cropped) {
           gesture.values.heightPx = pixels(gesture.height + dy, 8, 4000);
@@ -541,7 +544,7 @@ export default function App() {
       if (event.button !== 0 || event.target instanceof Element && event.target.closest('[contenteditable],a,button,input,textarea,select')) return;
       if (!(event.target instanceof Element)) return;
       if (previewClickToEdit) {
-        const item = event.target.closest<HTMLElement>('.site-free-item[data-edit-id]');
+        const item = event.target.closest<HTMLElement>(MOVABLE_SELECTOR);
         if (item) { startFreeGesture(item, event); return; }
       }
       if (previewSelectionScope === 'multiple') {
@@ -688,18 +691,20 @@ export default function App() {
       }
       // Editor shortcuts work while the page has focus; typing into a text keeps the browser's own.
       if (previewClickToEdit && !(event.target instanceof HTMLElement && event.target.isContentEditable)) {
-        // Arrow keys nudge the selected free item (Shift: 10px).
+        // Arrow keys nudge the selected movable item (Shift: 10px).
         const selectedId = lastEditElement.current;
-        if (event.key.startsWith('Arrow') && selectedId?.startsWith('free.')) {
-          const item = document.querySelector<HTMLElement>(`[data-edit-id="${CSS.escape(selectedId)}"]`);
-          const layer = item?.offsetParent;
-          if (item && layer instanceof HTMLElement && layer.clientWidth > 0) {
+        const selectedMovable = event.key.startsWith('Arrow') ? movableElement(selectedId) : null;
+        if (selectedId && selectedMovable) {
+          const item = selectedMovable;
+          const layer = item.offsetParent;
+          if (layer instanceof HTMLElement && layer.clientWidth > 0) {
             event.preventDefault();
             const step = event.shiftKey ? 10 : 1;
             const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
             const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
-            const posX = Math.min(200, Math.max(-100, Math.round((item.offsetLeft + dx) / layer.clientWidth * 10000) / 100));
-            const posY = Math.min(8000, Math.max(-2000, item.offsetTop + dy));
+            const bounded = keepInBounds(item, layer, item.offsetLeft + dx, item.offsetTop + dy, item.offsetWidth);
+            const posX = Math.min(200, Math.max(-100, Math.round(bounded.left / layer.clientWidth * 10000) / 100));
+            const posY = Math.min(8000, Math.max(-2000, Math.round(bounded.top)));
             window.parent.postMessage({ type: 'luka-website-editor-free-change', id: selectedId, values: { posX, posY } }, window.location.origin);
             return;
           }
@@ -745,7 +750,7 @@ export default function App() {
     document.body.append(hoverTag);
     const handleHover = (event: MouseEvent) => {
       if (!previewClickToEdit || free || !(event.target instanceof Element)) { hoverTag.hidden = true; return; }
-      const freeItem = event.target.closest<HTMLElement>('.site-free-item[data-edit-id]');
+      const freeItem = event.target.closest<HTMLElement>(MOVABLE_SELECTOR);
       const text = freeItem ? null : event.target.closest<HTMLElement>('[data-edit-text], [data-website-editor-inline-field]');
       const element = freeItem ?? (text ? elementOwner(text) : event.target.closest<HTMLElement>('[data-edit-id]'));
       const target = text ?? element;
@@ -1019,11 +1024,37 @@ function describeEditElement(element: HTMLElement) {
   };
 }
 
-/** Shows the handles on the selected free item (an attribute React leaves alone). */
+/**
+ * Things that can be dragged, sized and turned in the editor: free text/pictures, and built-in
+ * pieces marked movable (the hero lettering, which stays inside its area: data-edit-bounds).
+ */
+const MOVABLE_SELECTOR = '.site-free-item[data-edit-id], [data-edit-movable][data-edit-id]';
+
+const movableElement = (id: string | null) => {
+  if (!id) return null;
+  const element = document.querySelector<HTMLElement>(`[data-edit-id="${CSS.escape(id)}"]`);
+  return element?.matches(MOVABLE_SELECTOR) ? element : null;
+};
+
+/**
+ * Items marked data-edit-bounds="contain" stay inside their area: fully inside it from side to
+ * side, a little play up and down, and between a quarter and the whole width in size.
+ */
+function keepInBounds(item: HTMLElement, layer: HTMLElement, left: number, top: number, width: number) {
+  if (item.dataset.editBounds !== 'contain') return { left, top, width };
+  const room = Math.max(1, layer.clientWidth);
+  const size = Math.min(room, Math.max(room * 0.25, width));
+  return {
+    left: Math.min(Math.max(0, left), room - size),
+    top: Math.min(Math.max(-60, top), 200),
+    width: size,
+  };
+}
+
+/** Shows the handles on the selected movable item (an attribute React leaves alone). */
 function markSelectedFreeItem(id: string | null) {
   document.querySelectorAll('[data-free-selected]').forEach((node) => node.removeAttribute('data-free-selected'));
-  if (!id?.startsWith('free.')) return;
-  document.querySelector(`[data-edit-id="${CSS.escape(id)}"]`)?.setAttribute('data-free-selected', '');
+  movableElement(id)?.setAttribute('data-free-selected', '');
 }
 
 /** Drops the temporary drag styles once the stored values are on the page. */

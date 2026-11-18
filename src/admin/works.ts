@@ -4,6 +4,7 @@
  * there is no separate draft step. Uploads use the same bucket and paths as the full editor.
  */
 import { supabase } from '../lib/supabase';
+import { isThumbnailPath, thumbnailPath, uploadThumbnail } from '../lib/imageThumbnail';
 import type { AdminCategoryRow, AdminProjectRow } from './types';
 
 const BUCKET = 'portfolio-images';
@@ -49,7 +50,55 @@ async function uploadImage(projectId: string, file: File) {
     cacheControl: '3600', contentType: imageMimeType(file), upsert: false,
   });
   if (error) throw error;
+  // A light copy for the site's small views (if it fails, the site shows the original).
+  await uploadThumbnail(client(), BUCKET, path, file);
   return path;
+}
+
+export type ThumbnailReport = { total: number; made: number; failed: number; existing: number };
+
+/**
+ * Makes light copies for every stored work image (main images and galleries, hidden works too)
+ * that doesn't have one yet. Originals are only read, never changed. Three at a time.
+ */
+export async function createMissingThumbnails(onProgress?: (done: number, total: number) => void): Promise<ThumbnailReport> {
+  const db = client();
+  const [projects, gallery] = await Promise.all([
+    db.from('portfolio_projects').select('cover_image_path').is('deleted_at', null).not('cover_image_path', 'is', null),
+    db.from('portfolio_gallery_images').select('image_path'),
+  ]);
+  if (projects.error) throw projects.error;
+  if (gallery.error) throw gallery.error;
+  const paths = [...new Set([
+    ...((projects.data ?? []) as { cover_image_path: string }[]).map((row) => row.cover_image_path),
+    ...((gallery.data ?? []) as { image_path: string }[]).map((row) => row.image_path),
+  ])].filter((path) => path && !isThumbnailPath(path));
+
+  // Which ones already have a light copy (a signed link can only be made for an existing file).
+  const existing = new Set<string>();
+  for (let start = 0; start < paths.length; start += 100) {
+    const batch = paths.slice(start, start + 100);
+    const { data } = await db.storage.from(BUCKET).createSignedUrls(batch.map(thumbnailPath), 60);
+    (data ?? []).forEach((item, index) => { if (item.signedUrl) existing.add(batch[index]); });
+  }
+  const missing = paths.filter((path) => !existing.has(path));
+
+  let done = 0;
+  let made = 0;
+  let failed = 0;
+  onProgress?.(0, missing.length);
+  const queue = [...missing];
+  const worker = async () => {
+    for (let path = queue.shift(); path; path = queue.shift()) {
+      const { data: file, error } = await db.storage.from(BUCKET).download(path);
+      if (!error && file && await uploadThumbnail(db, BUCKET, path, file)) made += 1;
+      else failed += 1;
+      done += 1;
+      onProgress?.(done, missing.length);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  return { total: paths.length, made, failed, existing: existing.size };
 }
 
 /** Works of one category in site order (the order the public catalog uses). */

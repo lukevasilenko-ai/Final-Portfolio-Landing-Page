@@ -121,9 +121,10 @@ export interface WebsiteTemplateSeed {
 const nativeCopy: Record<NativeSectionKey, Record<string, string>> = {
   hero: {
     eyebrow: 'გრაფიკული დიზაინერი',
-    titleLine1: 'ესთეტიკა,',
-    titleLine2: 'იდეა და ხასიათი',
-    titleLine3: 'ერთ დიზაინში',
+    // The hero statement: two lines, then the words the last line cycles through (see heroPhraseCopy).
+    titleLine1: 'ვქმნი დიზაინს,',
+    titleLine2: 'რომელიც',
+    titleLine3: 'ყიდის / ჩანს / ახსოვთ / მუშაობს',
     description: 'გამარჯობა, მე ვარ ლუკა ვასილენკო. მე ვქმნი თვალშისაცემ ვიზუალურ პროდუქტებს, სადაც კრეატიული იდეები და ვიზუალური მინიმალიზმი ერთმანეთს ერწყმის. სპეციალიზებული ვარ სოც. მედია პოსტერების, ლოგოების, ბანერების, სავიზიტო ბარათების, ბრენდინგისა და რებრენდინგის მიმართულებით. ვმუშაობ Adobe Photoshop-სა და Adobe Illustrator-ში.',
     primaryButtonLabel: 'ნამუშევრების დათვალიერება',
     imageAlt: 'ავეჯის სარეკლამო პოსტერი',

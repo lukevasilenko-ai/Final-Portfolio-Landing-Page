@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowUpRight, Eye, EyeOff, ImagePlus, Images, LoaderCircle, Pencil, Star, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Eye, EyeOff, ImagePlus, Images, LoaderCircle, Pencil, Star, Trash2, Upload, X, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { PORTFOLIO_CATEGORIES } from '../data/portfolioItems';
 import { adminConfirm, adminToast } from './feedback';
 import type { AdminCategoryRow, AdminProjectRow } from './types';
 import {
-  addGalleryImages, createWork, loadGallery, nextWorkTitle, removeGalleryImage, renameWork,
+  addGalleryImages, createMissingThumbnails, createWork, loadGallery, nextWorkTitle, removeGalleryImage, renameWork,
   saveGalleryOrder, saveWorkOrder, setMainImage, setWorkVisible, splitImageFiles, worksInCategory,
   type GalleryImage,
 } from './works';
@@ -26,6 +26,40 @@ type Props = {
 
 function rejectedToast(rejected: string[]) {
   if (rejected.length) adminToast(`${formatNumber(rejected.length)} ფაილი გამოტოვდა — მხოლოდ JPG, PNG, WEBP ან AVIF, მაქს. 50 მბ.`, 'error');
+}
+
+/**
+ * Makes light copies for works uploaded before light copies existed (new uploads get one on their
+ * own). Safe to run again: it only does the images that still lack one.
+ */
+function ThumbnailsButton() {
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const run = async () => {
+    const confirmed = await adminConfirm({
+      title: 'სურათების მსუბუქი ასლები',
+      message: 'ყველა ნამუშევრის სურათს შეექმნება პატარა, მსუბუქი ასლი — საიტი მას აჩვენებს ბადეში და ზოლში, რომ უფრო სწრაფად ჩაიტვირთოს. ორიგინალები არ იცვლება. რამდენიმე წუთი შეიძლება დასჭირდეს; გვერდი არ დახუროთ.',
+      confirmLabel: 'შექმნა',
+    });
+    if (!confirmed) return;
+    setProgress({ done: 0, total: 0 });
+    try {
+      const report = await createMissingThumbnails((done, total) => setProgress({ done, total }));
+      if (report.made === 0 && report.failed === 0) adminToast('ყველა სურათს უკვე აქვს მსუბუქი ასლი.', 'success');
+      else if (report.failed === 0) adminToast(`შეიქმნა ${formatNumber(report.made)} მსუბუქი ასლი.`, 'success');
+      else adminToast(`შეიქმნა ${formatNumber(report.made)}, ვერ შეიქმნა ${formatNumber(report.failed)}. სცადეთ ხელახლა — დარჩენილებს გააგრძელებს.`, 'error');
+    } catch {
+      adminToast('ვერ დასრულდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა — დაწყებულს გააგრძელებს.', 'error');
+    } finally {
+      setProgress(null);
+    }
+  };
+  return (
+    <button className="admin-button admin-button-quiet" type="button" onClick={() => { void run(); }} disabled={progress !== null}
+      title="ძველი ნამუშევრებისთვის პატარა ასლების შექმნა (საიტი უფრო სწრაფად ჩაიტვირთება)">
+      {progress ? <LoaderCircle className="admin-spin" aria-hidden="true" /> : <Zap aria-hidden="true" />}
+      {progress ? `ასლები… ${formatNumber(progress.done)}/${formatNumber(progress.total)}` : 'მსუბუქი ასლები'}
+    </button>
+  );
 }
 
 /** Big drop target; also opens the file picker on click. */
@@ -156,7 +190,10 @@ function CategoryList({ projects, categories, covers, trashCount, onOpenTrash, o
       <PageHead
         title="პროექტები"
         text="ზუსტად ისე, როგორც საიტზეა. გახსენით და ჩააგდეთ ახალი ნამუშევრები."
-        actions={trashCount > 0 ? <button className="admin-button admin-button-quiet" type="button" onClick={onOpenTrash}><Trash2 aria-hidden="true" /> წაშლილი <span className="admin-button-count">{formatNumber(trashCount)}</span></button> : undefined}
+        actions={<>
+          <ThumbnailsButton />
+          {trashCount > 0 && <button className="admin-button admin-button-quiet" type="button" onClick={onOpenTrash}><Trash2 aria-hidden="true" /> წაშლილი <span className="admin-button-count">{formatNumber(trashCount)}</span></button>}
+        </>}
       />
       <div className="works-category-grid">{onSite.map(card)}</div>
       {others.length > 0 && (

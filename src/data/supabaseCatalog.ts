@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { signThumbnails } from '../lib/imageThumbnail';
 import { ALL_PORTFOLIO_CATEGORY, PORTFOLIO_CATEGORIES } from './portfolioItems';
 import type { PortfolioCategory, PortfolioItem, PortfolioItemCategory, PortfolioProject } from '../types';
 import { summarizeCategories, type CategorySummary, type SummaryCategoryRow, type SummaryProjectRow } from './categorySummary';
@@ -137,7 +138,11 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
     ...galleryRows.map((image) => image.image_path),
   ])];
 
-  const signedUrlByPath = await createSignedUrlMap(imagePaths);
+  // Light copies are optional (older images may have none yet), so they're signed separately.
+  const [signedUrlByPath, thumbnailByPath] = await Promise.all([
+    createSignedUrlMap(imagePaths),
+    signThumbnails(client, 'portfolio-images', imagePaths, signedUrlLifetimeSeconds).catch(() => new Map<string, string>()),
+  ]);
   const missingPath = imagePaths.find((path) => !signedUrlByPath.has(path));
   if (missingPath) throw new Error('კატალოგის ზოგი სურათისთვის დროებითი ბმული ვერ შეიქმნა. მონაცემები სრულად არ ჩაიტვირთა.');
 
@@ -177,6 +182,7 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
       serviceType: row.service_type || category.name,
       industry: row.industry || category.name,
       image: signedUrlByPath.get(galleryImage.image_path) ?? '',
+      thumbnail: thumbnailByPath.get(galleryImage.image_path),
       imagePath: galleryImage.image_path,
       description: galleryImage.caption || row.description,
       tags: row.tags ?? [],
@@ -214,6 +220,7 @@ export async function loadSupabaseCatalog(): Promise<SupabaseCatalog> {
       serviceType: row.service_type || category.name,
       industry: row.industry || category.name,
       image,
+      thumbnail: row.cover_image_path ? thumbnailByPath.get(row.cover_image_path) : undefined,
       imagePath: row.cover_image_path ?? undefined,
       description: row.description,
       tags: row.tags ?? [],

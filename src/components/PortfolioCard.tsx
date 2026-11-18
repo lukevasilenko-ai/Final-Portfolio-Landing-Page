@@ -130,7 +130,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
               </div>
             ) : (
               <img
-                src={item.image}
+                src={item.thumbnail ?? item.image}
                 alt={item.title}
                 draggable={organizer ? false : undefined}
                 className="absolute left-1/2 top-1/2 h-[95.238%] w-[95.238%] -translate-x-1/2 -translate-y-1/2 object-contain transition-transform duration-500 ease-out group-hover:scale-[1.018]"
@@ -230,7 +230,7 @@ export default function PortfolioCard({ item, onOpen, compact = false, imageOnly
       >
         <div className={`relative overflow-hidden border-b border-[var(--brand-line)] ${compact ? 'aspect-[4/3]' : 'aspect-[16/11]'}`}>
           <img
-            src={item.image}
+            src={item.thumbnail ?? item.image}
             alt={item.title}
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]"
             onError={() => setHasImageError(true)}

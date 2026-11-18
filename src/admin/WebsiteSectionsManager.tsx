@@ -47,7 +47,7 @@ const iconLabels: Record<NonNullable<WebsiteBlock['icon']>, string> = {
 
 const copyLabels: Record<string, string> = {
   eyebrow: 'ზედა წარწერა', title: 'სათაური', titleLine1: 'სათაურის პირველი ხაზი',
-  titleLine2: 'სათაურის მეორე ხაზი', titleLine3: 'აქცენტირებული ხაზი', description: 'აღწერა',
+  titleLine2: 'სათაურის მეორე ხაზი', titleLine3: 'ცვალებადი სიტყვები („/“-ით)', description: 'აღწერა',
   primaryButtonLabel: 'მთავარი ღილაკი', imageAlt: 'სურათის აღწერა', featuredLabel: 'სურათის წარწერა',
   profileName: 'სახელი', role: 'პროფესია', profileDescription: 'პროფილის აღწერა',
   featureOneTitle: 'პირველი ბარათის სათაური', featureOneText: 'პირველი ბარათის აღწერა',

@@ -435,16 +435,24 @@ html[data-surface="site"] body {
     padding-right: var(--strip-gap);
   }
 
+  /* All posters are the same height; each keeps its own shape (--ratio = width ÷ height). */
   .work-strip-item {
     position: relative;
     display: block;
     flex: 0 0 auto;
-    width: var(--strip-tile);
-    aspect-ratio: 1;
+    width: calc(var(--strip-tile) * var(--ratio, 1));
+    height: var(--strip-tile);
     border-radius: var(--radius-card);
     background: var(--brand-page-soft);
-    transition: transform 720ms var(--strip-spring), box-shadow 720ms var(--motion-ease);
+    transition: transform 720ms var(--strip-spring), box-shadow 720ms var(--motion-ease), width 500ms var(--motion-ease);
   }
+
+  /* While the live list loads: quiet empty tiles that breathe a little. */
+  .work-strip-item.is-placeholder {
+    pointer-events: none;
+    animation: work-strip-wait 1.4s ease-in-out infinite alternate;
+  }
+  @keyframes work-strip-wait { from { opacity: 0.55; } to { opacity: 1; } }
 
   .work-strip-item img {
     display: block;
@@ -526,6 +534,10 @@ html[data-surface="site"] body {
     .work-strip-item::before,
     .work-strip-item::after {
       transition: none !important;
+    }
+
+    .work-strip-item.is-placeholder {
+      animation: none;
     }
   }
 

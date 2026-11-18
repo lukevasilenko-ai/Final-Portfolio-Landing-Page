@@ -240,9 +240,13 @@ html[data-website-editor="inline"] .site-free-item .site-free-text { cursor: mov
 /* A picture that can't load still shows a box, so it can be selected and replaced. */
 html[data-website-editor="inline"] .site-free-item.is-image { min-height: 40px; }
 html[data-website-editor="inline"] .site-free-item .site-free-text[contenteditable] { cursor: text !important; user-select: text; }
-html[data-website-editor="inline"] .site-free-item[data-free-selected] { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-html[data-website-editor="inline"] .site-free-item[data-free-dragging] { outline-style: dashed; }
-html[data-website-editor="inline"] .site-free-item[data-free-selected] > .site-free-handle {
+html[data-website-editor="inline"] [data-edit-movable] { cursor: move !important; touch-action: none; user-select: none; }
+html[data-website-editor="inline"] .site-free-item[data-free-selected],
+html[data-website-editor="inline"] [data-edit-movable][data-free-selected] { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+html[data-website-editor="inline"] .site-free-item[data-free-dragging],
+html[data-website-editor="inline"] [data-edit-movable][data-free-dragging] { outline-style: dashed; }
+html[data-website-editor="inline"] .site-free-item[data-free-selected] > .site-free-handle,
+html[data-website-editor="inline"] [data-edit-movable][data-free-selected] > .site-free-handle {
   display: block;
   position: absolute;
   z-index: 2;

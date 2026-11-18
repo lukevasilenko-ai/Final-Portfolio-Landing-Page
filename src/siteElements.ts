@@ -12,7 +12,8 @@ export const SITE_ELEMENTS_KEY = 'site-elements';
 /** Unpublished working copy (admin-only: site_content rows are public only when published). */
 export const SITE_ELEMENTS_DRAFT_KEY = 'site-elements-draft';
 export const SITE_ELEMENTS_LOCALE = 'ka';
-export const STRIP_LIMIT = 30;
+/** Room for the whole posters category (the strip's default) once it is edited by hand. */
+export const STRIP_LIMIT = 60;
 
 export interface SiteElements {
   /** Element ids hidden on the site. */
